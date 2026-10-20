@@ -85,20 +85,18 @@ export async function createEquipmentPdf(project: ReportProject) {
   const text = (s: unknown) => String(s ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/[\u2010-\u2015]/g, '-');
   const wrapped = (s: string, w: number) => doc.splitTextToSize(text(s), w) as string[];
   const startPage = (section: string) => {
-    doc.setFillColor(15, 35, 86); doc.rect(0, 0, 210, 8, 'F');
     // Place the exact hexagon from the existing corporate artwork, retaining its proportions.
     // Source bounds: x=1270..1880, y=30..725 in the original 3145 x 1249 image.
-    const logoScale = 16 / 695;
+    const logoScale = 9 / 695;
     doc.saveGraphicsState();
-    doc.rect(14, 13, 610 * logoScale, 16, null);
+    doc.rect(188, 16, 610 * logoScale, 9, null);
     doc.clip(); doc.discardPath();
-    doc.addImage(assurChileLogo, 'PNG', 14 - 1270 * logoScale, 13 - 30 * logoScale,
+    doc.addImage(assurChileLogo, 'PNG', 188 - 1270 * logoScale, 16 - 30 * logoScale,
       3145 * logoScale, 1249 * logoScale, 'assurchile-corporate', 'FAST');
     doc.restoreGraphicsState();
-    doc.setTextColor(15, 35, 86); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    doc.text('ASSURCHILE', 33, 15.5);
-    doc.setTextColor(35, 30, 45); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-    doc.text('Informe de equipos y materiales', 33, 23);
+    doc.setTextColor(40, 43, 48); doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    doc.text('Informe de equipos y materiales', 14, 23);
+    doc.setDrawColor(207, 211, 216); doc.setLineWidth(0.25); doc.line(14, 30, 196, 30);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     const title = wrapped(m.projectName || 'Proyecto sin nombre', width);
     doc.text(title, 14, 36); y = 36 + title.length * 4.2;
@@ -119,7 +117,7 @@ export async function createEquipmentPdf(project: ReportProject) {
   };
   const table = (headers: string[], data: string[][], widths: number[], section: string) => {
     const header = () => {
-      doc.setFillColor(237, 241, 248); doc.rect(14, y, width, 8, 'F');
+      doc.setFillColor(244, 245, 246); doc.rect(14, y, width, 8, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
       let x = 14; headers.forEach((h, i) => { doc.text(h, x + 2, y + 5); x += widths[i]; });
       y += 8;
@@ -157,7 +155,7 @@ export async function createEquipmentPdf(project: ReportProject) {
   const pages = doc.getNumberOfPages();
   for (let page = 1; page <= pages; page++) {
     doc.setPage(page); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(90);
-    doc.text('Assur Proyect Studio | Complemento del plano', 14, 288);
+    doc.text(`Complemento del plano | Lámina ${m.sheetNumber || 'S/N'} | Rev. ${m.revision || '-'}`, 14, 288);
     doc.text(`${page} / ${pages}`, 196, 288, { align: 'right' });
   }
   return doc;
