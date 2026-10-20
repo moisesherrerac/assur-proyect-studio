@@ -232,16 +232,9 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
 
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                    Empresa / Firma Proyectista (Banner Cajetín)
+                    Marca del cajetín
                   </label>
-                  <input
-                    type="text"
-                    value={metadata.engineerCompany}
-                    onChange={e =>
-                      setMetadata(prev => ({ ...prev, engineerCompany: e.target.value }))
-                    }
-                    className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2.5 py-1.5 text-slate-900 font-bold font-mono text-xs focus:border-sky-500 focus:outline-none"
-                  />
+                  <p className="text-sm font-bold text-slate-900">ASSUR CHILE</p>
                 </div>
 
                 <div>

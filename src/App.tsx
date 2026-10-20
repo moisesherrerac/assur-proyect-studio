@@ -79,7 +79,7 @@ const DEFAULT_METADATA: ProjectMetadata = {
   engineerName: '',
   engineerTitle: '',
   engineerLicense: '',
-  engineerCompany: 'ASSUR PROYECT STUDIO',
+  engineerCompany: 'ASSUR CHILE',
   northAngle: 0,
   projectNotes: [
     '1. UBICACIÓN Y ORIENTACIÓN DE EQUIPOS REFERENCIAL, SUJETA A LEVANTAMIENTO EN TERRENO.',

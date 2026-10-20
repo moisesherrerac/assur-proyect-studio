@@ -16,6 +16,7 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from '../types/cad';
+import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
@@ -201,8 +202,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   useEffect(() => {
     fitSheetToScreen();
+    const observer = new ResizeObserver(fitSheetToScreen);
+    if (containerRef.current) observer.observe(containerRef.current);
     window.addEventListener('resize', fitSheetToScreen);
-    return () => window.removeEventListener('resize', fitSheetToScreen);
+    return () => { observer.disconnect(); window.removeEventListener('resize', fitSheetToScreen); };
   }, [fitSheetToScreen]);
 
   // Load processed CAD / Orthophoto image
@@ -1495,7 +1498,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
       // Adapt row height if many distinct camera colors/criteria are added
       const maxSymRows = Math.min(dynamicRows.length, 7);
-      const rowHeight = maxSymRows >= 6 ? 39 : 45;
+      const rowHeight = maxSymRows >= 6 ? 44 : 51;
 
       const drawSymRow = (
         drawIconFn: (cx: number, cy: number) => void,
@@ -1506,19 +1509,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       ) => {
         drawIconFn(sideX + 38, yPos + rowHeight / 2);
 
-        ctx.textAlign = 'left';
+        ctx.save();
         ctx.fillStyle = inkColor;
-        ctx.font = 'bold 12.5px "Chakra Petch", sans-serif';
-        ctx.fillText(title, sideX + 74, yPos + rowHeight * 0.36);
-
+        drawFittedText(ctx, title, sideX + 72, yPos + 5, sideW - 132, rowHeight - 21,
+          { size: 12.5, minSize: 10.5, maxLines: 2 });
         ctx.fillStyle = subInkColor;
-        ctx.font = '600 10px "Chakra Petch", sans-serif';
-        ctx.fillText(subtitle.slice(0, 26), sideX + 74, yPos + rowHeight * 0.72);
-
-        ctx.textAlign = 'right';
+        drawFittedText(ctx, subtitle, sideX + 72, yPos + rowHeight - 16, sideW - 132, 13,
+          { size: 10, minSize: 9, weight: '600', maxLines: 1 });
         ctx.fillStyle = inkColor;
-        ctx.font = 'bold 14.5px "Chakra Petch", monospace';
-        ctx.fillText(countStr, sideX + sideW - 16, yPos + rowHeight * 0.54);
+        drawFittedText(ctx, countStr, sideX + sideW - 48, yPos + 5, 32, rowHeight - 10,
+          { size: 14.5, minSize: 11, maxLines: 1, align: 'right', middle: true });
+        ctx.restore();
 
         ctx.strokeStyle = isDarkSheet ? '#334155' : '#94a3b8';
         ctx.lineWidth = 1;
@@ -1629,7 +1630,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       metadata.projectNotes.slice(0, 5).forEach(note => {
         const lines = wrapText(note.toUpperCase(), sideW - 28);
         lines.forEach(line => {
-          if (curY < sideBottom - 365) {
+          if (curY + 16.5 < sideBottom - 370 - (sigImageRef.current ? 70 : 16)) {
             ctx.fillText(line, sideX + 14, curY);
             curY += 16.5;
           }
@@ -1639,20 +1640,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
       // 14D. BOTTOM COMPANY BANNER & FORMAL TITLE BLOCK TABLE
       const tableBottom = sideBottom;
-      const bannerY = tableBottom - 340;
-      const bannerH = 68;
+      const bannerY = tableBottom - 370;
+      const bannerH = 52;
 
       ctx.fillStyle = '#000000';
       ctx.fillRect(sideX, bannerY, sideW, bannerH);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '600 32px "Chakra Petch", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(
-        (metadata.engineerCompany || 'ASSURCHILE').toUpperCase(),
-        sideX + sideW / 2,
-        bannerY + bannerH / 2 + 2
-      );
+      drawFittedText(ctx, 'ASSUR CHILE', sideX + 16, bannerY + 8, sideW - 32, bannerH - 16,
+        { size: 27, minSize: 22, maxLines: 1, align: 'center', middle: true });
 
       let cellY = bannerY + bannerH;
 
@@ -1668,47 +1663,27 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         ctx.lineWidth = 1.2;
         ctx.strokeRect(xPos, yPos, wCell, hCell);
 
-        ctx.textAlign = 'left';
+        ctx.save();
         ctx.fillStyle = subInkColor;
-        ctx.font = '600 9.5px "Chakra Petch", sans-serif';
-        ctx.fillText(label, xPos + 10, yPos + 13);
-
+        drawFittedText(ctx, label, xPos + 12, yPos + 8, wCell - 24, 12,
+          { size: 9.5, minSize: 9, weight: '600', maxLines: 1 });
         ctx.fillStyle = inkColor;
-        ctx.font = 'bold 13.5px "Chakra Petch", sans-serif';
-        valLines.forEach((l, idx) => {
-          ctx.fillText(l, xPos + 10, yPos + 31 + idx * 16);
-        });
+        drawFittedText(ctx, valLines.join(' '), xPos + 12, yPos + 25, wCell - 24, hCell - 31,
+          { size: 13.5, minSize: 10.5, maxLines: 3 });
+        ctx.restore();
       };
 
-      ctx.font = 'bold 13.5px "Chakra Petch", sans-serif';
-      const projLines = wrapText((metadata.projectName || '').toUpperCase(), sideW - 22).slice(0, 2);
-      drawTitleCell('PROYECTO', projLines, sideX, cellY, sideW, 64);
-      cellY += 64;
-
-      drawTitleCell(
-        'CLIENTE',
-        [(metadata.clientName || '').toUpperCase()],
-        sideX,
-        cellY,
-        sideW,
-        48
-      );
-      cellY += 48;
-
-      drawTitleCell(
-        'CONTENIDO',
-        [(metadata.location || 'PLANTA GENERAL · CCTV Y AUDIO').toUpperCase()],
-        sideX,
-        cellY,
-        sideW,
-        48
-      );
-      cellY += 48;
+      drawTitleCell('PROYECTO', [(metadata.projectName || '').toUpperCase()], sideX, cellY, sideW, 76);
+      cellY += 76;
+      drawTitleCell('CLIENTE', [(metadata.clientName || '').toUpperCase()], sideX, cellY, sideW, 68);
+      cellY += 68;
+      drawTitleCell('CONTENIDO', [(metadata.location || 'PLANTA GENERAL · CCTV Y AUDIO').toUpperCase()], sideX, cellY, sideW, 76);
+      cellY += 76;
 
       const halfW = sideW / 2;
-      drawTitleCell('ESCALA', [metadata.scale || 'S/E'], sideX, cellY, halfW, 46);
-      drawTitleCell('FECHA', [metadata.date || '16-10-2026'], sideX + halfW, cellY, halfW, 46);
-      cellY += 46;
+      drawTitleCell('ESCALA', [metadata.scale || 'S/E'], sideX, cellY, halfW, 48);
+      drawTitleCell('FECHA', [metadata.date || '16-10-2026'], sideX + halfW, cellY, halfW, 48);
+      cellY += 48;
 
       const remH = tableBottom - cellY;
       drawTitleCell('LÁMINA', [metadata.sheetNumber || 'L-01'], sideX, cellY, halfW, remH);
@@ -2136,9 +2111,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
       if (activeTool === 'select') {
         // Hit-test para rotación interactiva de la Rosa de los Vientos / Flecha del Norte
-        const innerM = 35;
-        const sideW = 410;
-        const sideX = SHEET_W - innerM - sideW;
+        const innerM = 52;
+        const sideX = 1808;
+        const sideW = SHEET_W - innerM - sideX;
         const sideTop = innerM;
         const northCenterX = sideX + sideW / 2;
         const northCenterY = sideTop + 118;
@@ -2278,9 +2253,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     }
 
     if (isRotatingNorth) {
-      const innerM = 35;
-      const sideW = 410;
-      const sideX = SHEET_W - innerM - sideW;
+      const innerM = 52;
+      const sideX = 1808;
+      const sideW = SHEET_W - innerM - sideX;
       const sideTop = innerM;
       const northCenterX = sideX + sideW / 2;
       const northCenterY = sideTop + 118;
