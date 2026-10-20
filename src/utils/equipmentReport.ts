@@ -76,6 +76,7 @@ export function exportEquipmentCsv(project: ReportProject) {
 /** Text-based PDF: repeating headers, wrapped cells, and rows split across pages when needed. */
 export async function createEquipmentPdf(project: ReportProject) {
   const { jsPDF } = await import('jspdf');
+  const { assurChileLogo } = await import('./assurChileLogo');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const m = project.metadata;
   const rows = buildEquipmentRows(project);
@@ -84,12 +85,23 @@ export async function createEquipmentPdf(project: ReportProject) {
   const text = (s: unknown) => String(s ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '').replace(/[\u2010-\u2015]/g, '-');
   const wrapped = (s: string, w: number) => doc.splitTextToSize(text(s), w) as string[];
   const startPage = (section: string) => {
-    doc.setFillColor(67, 35, 110); doc.rect(0, 0, 210, 8, 'F');
+    doc.setFillColor(15, 35, 86); doc.rect(0, 0, 210, 8, 'F');
+    // Place the exact hexagon from the existing corporate artwork, retaining its proportions.
+    // Source bounds: x=1270..1880, y=30..725 in the original 3145 x 1249 image.
+    const logoScale = 16 / 695;
+    doc.saveGraphicsState();
+    doc.rect(14, 13, 610 * logoScale, 16, null);
+    doc.clip(); doc.discardPath();
+    doc.addImage(assurChileLogo, 'PNG', 14 - 1270 * logoScale, 13 - 30 * logoScale,
+      3145 * logoScale, 1249 * logoScale, 'assurchile-corporate', 'FAST');
+    doc.restoreGraphicsState();
+    doc.setTextColor(15, 35, 86); doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    doc.text('ASSURCHILE', 33, 15.5);
     doc.setTextColor(35, 30, 45); doc.setFont('helvetica', 'bold'); doc.setFontSize(15);
-    doc.text('Informe de equipos y materiales', 14, 22);
+    doc.text('Informe de equipos y materiales', 33, 23);
     doc.setFontSize(9); doc.setFont('helvetica', 'normal');
     const title = wrapped(m.projectName || 'Proyecto sin nombre', width);
-    doc.text(title, 14, 30); y = 30 + title.length * 4.2;
+    doc.text(title, 14, 36); y = 36 + title.length * 4.2;
     for (const label of [`Cliente: ${m.clientName || 'Por completar'}`, `Ubicación: ${m.location || 'Por completar'}`,
       `Lámina ${m.sheetNumber || 'S/N'} | Revisión ${m.revision || '-'} | Fecha del plano: ${m.date || '-'}`]) {
       const lines = wrapped(label, width); doc.text(lines, 14, y); y += lines.length * 4.2;
@@ -107,7 +119,7 @@ export async function createEquipmentPdf(project: ReportProject) {
   };
   const table = (headers: string[], data: string[][], widths: number[], section: string) => {
     const header = () => {
-      doc.setFillColor(238, 233, 245); doc.rect(14, y, width, 8, 'F');
+      doc.setFillColor(237, 241, 248); doc.rect(14, y, width, 8, 'F');
       doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
       let x = 14; headers.forEach((h, i) => { doc.text(h, x + 2, y + 5); x += widths[i]; });
       y += 8;
