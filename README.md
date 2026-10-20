@@ -1,0 +1,118 @@
+# Assur Proyect Studio 📐
+
+> Estudio profesional de diseño técnico y convertidor de planos de seguridad electrónica, telecomunicaciones y videovigilancia estilo AutoCAD. 100% gratuito y de código abierto.
+
+---
+
+## 🌟 Características Principales
+
+- **Lienzo Técnico Interactivo (CAD 2D):**
+  - Espacio de trabajo de alta precisión con rejilla configurable y sistema *Snap to Grid*.
+  - Modos de tema visual: **CAD Oscuro**, **Papel Blueprint** y **Lámina Blanca**.
+  - Orientación y ajuste libre de rotación para la **Flecha de Norte** magnético/geográfico.
+  - Reglas milimétricas dinámicas en ejes X e Y, encuadre automático y zoom fluido.
+
+- **Ingeniería de Seguridad & Telecomunicaciones:**
+  - **Cámaras de Seguridad:** Tipos Domo, Bullet, PTZ, Térmica, 360°/Ojo de Pez con conos de visualización interactivos (FOV angular, distancia de identificación/reconocimiento, detección DORI).
+  - **Enlaces de Radio & WiFi:** Antenas sectoriales, omnidireccionales, enlaces punto a punto (PTP) y directivas con cálculo de cobertura.
+  - **Detección Perimetral:** Sensores infrarrojos fotoeléctricos, barreras de microondas y cercos electrificados.
+  - **Cableado Estructurado:** Trazado de canalizaciones para fibra óptica, cable UTP/STP, tubería conduit y bandejas porta-cables.
+
+- **Herramientas de Edición Profesional:**
+  - **Historial Completo de Deshacer / Rehacer (Undo / Redo):** Acceso rápido con botones en la barra de herramientas y atajos estándar de teclado (`Ctrl + Z` / `Ctrl + Y`).
+  - **Distribución Ergonómica:** Barra lateral izquierda para selección rápida de elementos y panel de ingeniería flotante/plegable para propiedades de dispositivos.
+  - **Cálculo Automático de Almacenamiento & Red:** Estimación en tiempo real de ancho de banda (Mbps) y capacidad de almacenamiento en disco (TB) según resolución, FPS, códec (H.264/H.265) y días de retención.
+  - **Exportación en Alta Definición:** Generación de planos en PDF vectorial con membrete profesional (Title Block), fecha, escala y especificaciones técnicas.
+  - **Persistencia Local:** Guardado y carga de proyectos completos en formato JSON sin necesidad de servidor.
+
+---
+
+## Publicación y uso
+
+La versión de GitHub Pages ejecuta el editor CAD, el guardado de proyectos y la exportación PDF en el navegador. No necesita una clave de Gemini. Sin clave, el botón de auditoría produce un cálculo local orientativo, no una respuesta de IA.
+
+El uso de una API de IA es opcional y depende de las condiciones y cuotas del proveedor. No publiques claves en el código ni en variables VITE_: se incluyen en los archivos visibles del navegador. Para una integración pública con IA se requiere un servicio intermedio que proteja las credenciales.
+
+## 🚀 Cómo publicar este proyecto en GitHub (Paso a Paso)
+
+Si deseas subir este proyecto a tu propia cuenta de GitHub, sigue estos sencillos pasos desde tu terminal o consola:
+
+### 1. Crear el repositorio en GitHub
+1. Inicia sesión en [GitHub](https://github.com).
+2. Haz clic en el botón verde **"New"** o entra a [github.com/new](https://github.com/new).
+3. Escribe como nombre del repositorio: `assur-proyect-studio`.
+4. Elige si deseas que sea **Público** (recomendado para uso gratuito y GitHub Pages) o Privado.
+5. Haz clic en **"Create repository"** (sin marcar "Add README" para no generar conflictos).
+
+### 2. Conectar y subir el código
+En la terminal de tu máquina, dentro de la carpeta del proyecto, ejecuta:
+
+```bash
+# 1. Inicializar git (si aún no está)
+git init
+
+# 2. Agregar todos los archivos
+git add .
+
+# 3. Crear el primer commit
+git commit -m "feat: Lanzamiento inicial de Assur Proyect Studio"
+
+# 4. Establecer la rama principal como 'main'
+git branch -M main
+
+# 5. Vincular con tu repositorio de GitHub (reemplaza TU_USUARIO por tu nombre de usuario)
+git remote add origin https://github.com/TU_USUARIO/assur-proyect-studio.git
+
+# 6. Subir el código a GitHub
+git push -u origin main
+```
+
+---
+
+## 🌐 Cómo activar el sitio web gratis en GitHub Pages
+
+Para que cualquier persona pueda usar **Assur Proyect Studio** en internet gratis desde su navegador mediante GitHub Pages:
+
+### Opción A: Despliegue automático con GitHub Actions (Recomendado)
+1. En tu repositorio de GitHub, ve a la pestaña **Settings** > **Pages**.
+2. En **Build and deployment** > **Source**, selecciona **GitHub Actions**.
+3. Elige la plantilla de **Static HTML / Vite** o crea el archivo `.github/workflows/deploy.yml` incluido en este proyecto.
+4. ¡Listo! Tu aplicación estará publicada cuando el flujo de despliegue termine correctamente en:
+   `https://moisesherrerac.github.io/assur-proyect-studio/`
+
+### Opción B: Despliegue en Vercel (1 Clic)
+1. Entra a [vercel.com](https://vercel.com) e inicia sesión con tu cuenta de GitHub.
+2. Selecciona **"Add New Project"** e importa tu repositorio `assur-proyect-studio`.
+3. Vercel detectará Vite automáticamente. Haz clic en **Deploy**.
+4. En 30 segundos tendrás una URL pública gratuita con SSL (ej: `assur-proyect-studio.vercel.app`).
+
+---
+
+## 💻 Desarrollo Local
+
+Para correr y modificar la aplicación en tu computadora localmente:
+
+### Requisitos previos
+- [Node.js](https://nodejs.org/) (versión 22.12 o superior).
+- Gestor de paquetes `npm`, `pnpm` o `bun`.
+
+### Instalación y ejecución
+```bash
+# Instalar dependencias
+npm ci
+
+# Iniciar servidor de desarrollo local
+npm run dev
+
+# Compilar para producción (carpeta dist/)
+npm run build
+
+# Previsualizar la versión de producción
+npm run preview
+```
+
+---
+
+## 📄 Licencia
+
+Este proyecto está bajo la licencia **MIT** - eres libre de usarlo, modificarlo, distribuirlo y utilizarlo de forma comercial o personal de manera 100% gratuita. Consulta el archivo [LICENSE](LICENSE) para más detalles.

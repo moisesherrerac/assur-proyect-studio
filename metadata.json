@@ -1,0 +1,6 @@
+{
+  "name": "Assur Proyect Studio",
+  "description": "Assur Proyect Studio: Diseñador y convertidor de planos técnicos estilo AutoCAD con editor de cámaras de seguridad, telecomunicaciones, cálculo de almacenamiento y exportación en alta calidad.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
