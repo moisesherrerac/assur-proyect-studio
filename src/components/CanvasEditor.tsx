@@ -16,6 +16,7 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from '../types/cad';
+import { nextLabel, distanceLabel } from '../utils/project';
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
   Check,
@@ -178,6 +179,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [currentPoints, setCurrentPoints] = useState<FencePoint[]>([]);
   const [cursorPos, setCursorPos] = useState<FencePoint>({ x: 0, y: 0 });
   const [measurePoints, setMeasurePoints] = useState<FencePoint[]>([]);
+  const [knownDistance, setKnownDistance] = useState('');
+  const [calibrationError, setCalibrationError] = useState('');
 
   const [bgImgLoaded, setBgImgLoaded] = useState<number>(0);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
@@ -684,7 +687,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             if ((st.showDimensions || isSelected) && segPx >= 65 && layers.labels) {
               const midX = (p1.x + p2.x) / 2;
               const midY = (p1.y + p2.y) / 2;
-              const meters = (segPx * 0.1).toFixed(1);
+              const meters = distanceLabel(segPx, metadata.metersPerUnit);
               let angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
               if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
                 angle += Math.PI;
@@ -694,7 +697,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
               ctx.translate(midX, midY);
               ctx.rotate(angle);
 
-              const dimText = `${meters}m`;
+              const dimText = meters;
               ctx.font = 'bold 9.5px "JetBrains Mono", monospace';
               const tw = ctx.measureText(dimText).width + 8;
 
@@ -1208,16 +1211,17 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         ctx.stroke();
 
         const distPx = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-        const meters = (distPx * 0.1).toFixed(1);
+        const meters = distanceLabel(distPx, metadata.metersPerUnit);
         const midX = (p1.x + p2.x) / 2;
         const midY = (p1.y + p2.y) / 2;
         ctx.fillStyle = '#e11d48';
-        ctx.fillRect(midX - 28, midY - 11, 56, 22);
+        const measureWidth = Math.max(60, ctx.measureText(meters).width + 20);
+        ctx.fillRect(midX - measureWidth / 2, midY - 11, measureWidth, 22);
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(`${meters} m`, midX, midY);
+        ctx.fillText(meters, midX, midY);
       }
 
       // 11B. Draw Live AutoCAD OSNAP Grid Marker & Orthogonal Alignment Crosshairs
@@ -1959,7 +1963,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       const newFence: ElectricFence = {
         id: `fence-${Date.now()}`,
         points: [...currentPoints],
-        label: `CERCO-0${nextNum}`,
+        label: nextLabel('CERCO', fences),
         status: 'nueva',
         color: '#d97706',
         linesCount: 6,
@@ -1974,7 +1978,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         id: `wire-${Date.now()}`,
         points: [...currentPoints],
         wireType: 'conduit-emt',
-        label: `RUTA-0${nextNum}`,
+        label: nextLabel('RUTA', wiring),
         color: '#059669'
       };
       setWiring(prev => [...prev, newWire]);
@@ -1986,6 +1990,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (e.target !== canvasRef.current) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const screenX = e.clientX - rect.left;
@@ -2001,7 +2006,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
     if (e.button === 0) {
       if (activeTool === 'measure') {
-        if (measurePoints.length === 0) {
+        if (measurePoints.length !== 1) {
           setMeasurePoints([snappedPt]);
         } else {
           setMeasurePoints([measurePoints[0], snappedPt]);
@@ -2050,9 +2055,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             : (activeTool as DeviceType);
 
         const prefix = isPtz ? 'PTZ' : cameraPreset.prefix || 'CN';
-        const samePrefixCount =
-          cameras.filter(c => c.label.startsWith(`${prefix}-`)).length + 1;
-        const numStr = samePrefixCount < 10 ? `0${samePrefixCount}` : `${samePrefixCount}`;
+        const code = nextLabel(prefix, cameras);
 
         const newCam: CameraDevice = {
           id: `cam-${Date.now()}`,
@@ -2062,7 +2065,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           rotation: 30,
           fovAngle: isPtz ? 360 : 52,
           range: isPtz ? 78 : 88,
-          label: `${prefix}-${numStr}`,
+          label: code,
           labelOffsetX: -46,
           labelOffsetY: -28,
           status: cameraPreset.status,
@@ -2086,7 +2089,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           rotation: 0,
           beamWidth: activeTool === 'antenna-ptp' ? 45 : 360,
           range: 110,
-          label: `ANT-0${nextNum}`,
+          label: nextLabel('ANT', antennas),
           status: 'nueva',
           color: '#2563eb',
           frequency: '5.8 GHz PTP'
@@ -2112,10 +2115,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           rotation: 20,
           label:
             activeTool === 'speaker-horn'
-              ? `BO-${numStr}`
+              ? nextLabel('BO', audioAlarms)
               : activeTool === 'siren-strobe'
-              ? `SIR-${numStr}`
-              : `RACK-${numStr}`,
+              ? nextLabel('SIR', audioAlarms)
+              : nextLabel('RACK', audioAlarms),
           labelOffsetX: 44,
           labelOffsetY: -28,
           status: 'nueva',
@@ -2435,24 +2438,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.querySelector('[role="dialog"]')) return;
       const activeEl = document.activeElement?.tagName.toLowerCase();
       const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select';
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-        if (!isTyping) {
-          e.preventDefault();
-          if (e.shiftKey) {
-            onRedo?.();
-          } else {
-            onUndo?.();
-          }
-        }
-      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-        if (!isTyping) {
-          e.preventDefault();
-          onRedo?.();
-        }
-      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId && !isTyping) {
           setStructures(prev => prev.filter(s => s.id !== selectedId));
           setCameras(prev => prev.filter(c => c.id !== selectedId));
@@ -2510,11 +2500,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative w-full h-full flex-1 overflow-hidden select-none cursor-crosshair bg-stone-200"
+      className="relative min-w-0 min-h-0 w-full h-full flex-1 overflow-hidden select-none cursor-crosshair bg-stone-200"
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
       onDragOver={e => {
         e.preventDefault();
         e.stopPropagation();
@@ -2660,7 +2651,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       )}
 
       {/* Floating Canvas View Controls (Friendly Light Studio Style) */}
-      <div className="absolute bottom-5 right-5 z-20 flex items-center gap-1 bg-white/95 border border-stone-200/90 rounded-xl p-1.5 shadow-lg backdrop-blur-md text-slate-700">
+      <div className="absolute bottom-5 right-3 z-20 flex items-center gap-1 max-w-[calc(100%-24px)] overflow-x-auto whitespace-nowrap [&>button]:shrink-0 bg-white/95 border border-stone-200/90 rounded-xl p-1.5 shadow-lg backdrop-blur-md text-slate-700">
         <button
           onClick={() => setZoom(prev => Math.min(prev * 1.2, 4.5))}
           title="Acercar (Zoom +)"
@@ -2754,6 +2745,23 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       </div>
 
       {/* Live CAD Coordinate & Snap Status HUD */}
+      {activeTool === 'measure' && <div className="absolute top-3 left-3 z-20 max-w-[calc(100%-24px)] bg-white rounded-lg border border-stone-300 p-3 shadow-md text-sm" onMouseDown={e => e.stopPropagation()} onMouseMove={e => e.stopPropagation()}>
+        <p className="font-semibold">Medir y calibrar distancia</p>
+        <p className="text-xs text-slate-600 mt-1">Marca dos puntos de distancia conocida. Un tercer clic inicia otra medición.</p>
+        {measurePoints.length === 2 && <form className="flex flex-wrap gap-2 items-end mt-2" onSubmit={e => {
+          e.preventDefault();
+          const meters = Number(knownDistance.replace(',', '.'));
+          const units = Math.hypot(measurePoints[1].x-measurePoints[0].x, measurePoints[1].y-measurePoints[0].y);
+          if (!Number.isFinite(meters) || meters <= 0 || units < 1 || meters > 1e7) { setCalibrationError('Ingresa una distancia positiva y marca dos puntos diferentes.'); return; }
+          setMetadata?.(prev => ({ ...prev, metersPerUnit: meters / units, scale: 'S/E' }));
+          setCalibrationError('Distancia calibrada. La escala de impresión sigue siendo S/E.');
+        }}>
+          <label className="text-xs">Distancia real (m)<input aria-label="Distancia real en metros" className="form-control max-w-36" inputMode="decimal" value={knownDistance} onChange={e=>setKnownDistance(e.target.value)}/></label>
+          <button className="action-button" type="submit">Calibrar</button>
+        </form>}
+        {calibrationError && <p role="status" className="text-xs mt-2">{calibrationError}</p>}
+        <button className="underline text-xs mt-2" onClick={() => {setActiveTool('select');setMeasurePoints([]);}}>Terminar medición</button>
+      </div>}
       <div className="absolute bottom-5 left-5 z-10 pointer-events-none hidden lg:flex items-center gap-3 text-[11px] font-medium text-slate-600 bg-white/95 px-3.5 py-1.5 rounded-lg border border-stone-200 shadow-xs backdrop-blur-xs">
         <span className="font-mono font-semibold text-slate-800 tabular-nums">
           X: {Math.round(cursorPos.x)} · Y: {Math.round(cursorPos.y)}

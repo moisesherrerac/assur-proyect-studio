@@ -20,6 +20,10 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from './types/cad';
+import { prepareImage } from './utils/images';
+import { validateProject, cleanSampleIdentity } from './utils/project';
+import { EquipmentReport } from './components/EquipmentReport';
+import type { EquipmentKind } from './utils/equipmentReport';
 import { processImageToCad } from './utils/cadFilter';
 import { autoVectorizeStructuresFromImage } from './utils/structureVectorizer';
 import { exportCadBlueprintToPdf } from './utils/pdfExport';
@@ -47,6 +51,8 @@ interface ProjectSnapshot {
   metadata: ProjectMetadata;
   cadBackgroundImageUrl: string | null;
   rawImageSrc: string | null;
+  filterSettings: ImageFilterSettings;
+  theme: CadTheme;
 }
 
 const DEFAULT_FILTER_SETTINGS: ImageFilterSettings = {
@@ -70,9 +76,9 @@ const DEFAULT_METADATA: ProjectMetadata = {
   revision: 'A',
   scale: 'S/E',
   date: new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-'),
-  engineerName: 'Ing. Carlos Mendoza Rivera',
-  engineerTitle: 'Ingeniero Electrónico y Telecomunicaciones',
-  engineerLicense: 'Reg. Prof. N° 148921',
+  engineerName: '',
+  engineerTitle: '',
+  engineerLicense: '',
   engineerCompany: 'ASSUR PROYECT STUDIO',
   northAngle: 0,
   projectNotes: [
@@ -91,15 +97,16 @@ const DEFAULT_PRESET: CameraInsertionPreset = {
 
 export default function App() {
   // Read existing autosave from localStorage if available
-  const initialSavedData = (() => {
+  const [initialSavedData] = useState(() => {
     try {
       const raw = localStorage.getItem(AUTOSAVE_STORAGE_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) return validateProject(JSON.parse(raw));
     } catch (e) {
       console.warn('No se pudo recuperar autoguardado previo', e);
+      return { recoveryError: true };
     }
     return null;
-  })();
+  });
 
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -163,7 +170,7 @@ export default function App() {
   );
 
   const [metadata, setMetadata] = useState<ProjectMetadata>(
-    initialSavedData?.metadata || DEFAULT_METADATA
+    cleanSampleIdentity({ ...DEFAULT_METADATA, ...initialSavedData?.metadata })
   );
 
   // Structures & Devices: empty clean slate by default
@@ -189,9 +196,14 @@ export default function App() {
     initialSavedData?.wiring || []
   );
 
-  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle'>(
-    initialSavedData ? 'saved' : 'idle'
+  const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving' | 'idle' | 'partial' | 'error'>(
+    initialSavedData?.recoveryError ? 'error' : initialSavedData ? 'saved' : 'idle'
   );
+  const hasSavedWorkRef = useRef(Boolean(initialSavedData && !initialSavedData.recoveryError));
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [pdfFormat, setPdfFormat] = useState<'a3' | 'a4'>('a3');
+  const [exporting, setExporting] = useState(false);
+  const [notice, setNotice] = useState('');
 
   const canvasRefInstance = useRef<HTMLCanvasElement | null>(null);
 
@@ -215,7 +227,7 @@ export default function App() {
     annotations: JSON.parse(JSON.stringify(annotations)),
     metadata: JSON.parse(JSON.stringify(metadata)),
     cadBackgroundImageUrl,
-    rawImageSrc
+    rawImageSrc, filterSettings: { ...filterSettings }, theme
   }), [
     structures,
     cameras,
@@ -226,7 +238,7 @@ export default function App() {
     annotations,
     metadata,
     cadBackgroundImageUrl,
-    rawImageSrc
+    rawImageSrc, filterSettings, theme
   ]);
 
   const areSnapshotsEqual = (a: ProjectSnapshot, b: ProjectSnapshot): boolean => {
@@ -316,6 +328,8 @@ export default function App() {
     setMetadata(previous.metadata || DEFAULT_METADATA);
     setCadBackgroundImageUrl(previous.cadBackgroundImageUrl);
     setRawImageSrc(previous.rawImageSrc);
+    setFilterSettings(previous.filterSettings || DEFAULT_FILTER_SETTINGS);
+    setTheme(previous.theme || DEFAULT_FILTER_SETTINGS.theme);
     setSelectedId(null);
 
     setCanUndo(pastRef.current.length > 0);
@@ -346,6 +360,8 @@ export default function App() {
     setMetadata(next.metadata || DEFAULT_METADATA);
     setCadBackgroundImageUrl(next.cadBackgroundImageUrl);
     setRawImageSrc(next.rawImageSrc);
+    setFilterSettings(next.filterSettings || DEFAULT_FILTER_SETTINGS);
+    setTheme(next.theme || DEFAULT_FILTER_SETTINGS.theme);
     setSelectedId(null);
 
     setCanUndo(true);
@@ -361,7 +377,7 @@ export default function App() {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement?.tagName.toLowerCase();
       const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select';
-      if (isTyping) return;
+      if (isTyping || document.querySelector('[role="dialog"]')) return;
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -393,7 +409,8 @@ export default function App() {
       wiring.length > 0 ||
       annotations.length > 0;
 
-    if (!hasDataToSave) return;
+    if (!hasDataToSave && !hasSavedWorkRef.current && JSON.stringify(metadata) === JSON.stringify(DEFAULT_METADATA)) return;
+    if (hasDataToSave) hasSavedWorkRef.current = true;
 
     setAutosaveStatus('saving');
     const timer = setTimeout(() => {
@@ -441,9 +458,9 @@ export default function App() {
             cameraPreset
           };
           localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(compactPayload));
-          setAutosaveStatus('saved');
+          setAutosaveStatus('partial');
         } catch (err2) {
-          setAutosaveStatus('idle');
+          setAutosaveStatus('error');
         }
       }
     }, 700);
@@ -483,7 +500,8 @@ export default function App() {
   };
 
   const handleExportPdf = async () => {
-    if (!canvasRefInstance.current) return;
+    if (!canvasRefInstance.current || exporting) return;
+    setExporting(true); setNotice('');
     try {
       await exportCadBlueprintToPdf({
         blueprintCanvas: canvasRefInstance.current,
@@ -494,11 +512,12 @@ export default function App() {
         wiring,
         metadata,
         theme,
-        format: 'a3'
+        format: pdfFormat
       });
     } catch (e: any) {
       console.error('Error al generar PDF', e);
-    }
+      setNotice('No se pudo generar el PDF. Guarda una copia .cadmap y vuelve a intentarlo.');
+    } finally { setExporting(false); }
   };
 
   // Download complete editable project file (.cadmap)
@@ -537,95 +556,54 @@ export default function App() {
   };
 
   // Load project file from file object (.cadmap or .json)
-  const loadProjectData = useCallback((data: any) => {
-    if (data.metadata) setMetadata(data.metadata);
-    if (data.structures) setStructures(data.structures);
-    if (data.cameras) setCameras(data.cameras);
-    if (data.antennas) setAntennas(data.antennas);
-    if (data.audioAlarms) setAudioAlarms(data.audioAlarms);
-    if (data.fences) setFences(data.fences);
-    if (data.wiring) setWiring(data.wiring);
-    if (data.annotations) setAnnotations(data.annotations);
-    if (data.theme) setTheme(data.theme);
-    if (data.layers) setLayers(data.layers);
-    if (data.locks) setLocks(data.locks);
-    if (data.cameraPreset) setCameraPreset(data.cameraPreset);
-    if (data.filterSettings) setFilterSettings(data.filterSettings);
+  const loadProjectData = useCallback((input: unknown) => {
+    const data = validateProject(input);
+    if (!window.confirm('Se abrirá otro proyecto y se reemplazará el plano actual. ¿Guardaste una copia .cadmap de tu trabajo?')) return;
+    commitSnapshot();
+    setMetadata(cleanSampleIdentity({ ...DEFAULT_METADATA, ...data.metadata }));
+    setStructures(data.structures || []); setCameras(data.cameras || []);
+    setAntennas(data.antennas || []); setAudioAlarms(data.audioAlarms || []);
+    setFences(data.fences || []); setWiring(data.wiring || []); setAnnotations(data.annotations || []);
+    setTheme(data.theme || 'technical-orthophoto');
+    setLayers({ mapBackground:true, structures:true, grid:true, camerasNew:true, camerasExisting:true, cameraFov:true, electricFences:true, wiring:true, antennas:true, audioAlarms:true, labels:true, ...data.layers });
+    setLocks({ structures:false, cameras:false, electricFences:false, wiring:false, antennas:false, audioAlarms:false, ...data.locks });
+    setCameraPreset({ ...DEFAULT_PRESET, ...data.cameraPreset });
+    setFilterSettings({ ...DEFAULT_FILTER_SETTINGS, ...data.filterSettings });
+    setCadBackgroundImageUrl(data.cadBackgroundImageUrl || data.rawImageSrc || null);
+    setRawImageSrc(data.rawImageSrc || null); setSelectedId(null);
+    hasSavedWorkRef.current = true;
+    setNotice('Proyecto abierto. El autoguardado pertenece a este navegador; conserva una copia .cadmap.');
+  }, [commitSnapshot]);
 
-    if (data.cadBackgroundImageUrl) {
-      setCadBackgroundImageUrl(data.cadBackgroundImageUrl);
-    }
-    if (data.rawImageSrc) {
-      setRawImageSrc(data.rawImageSrc);
-      if (!data.cadBackgroundImageUrl) {
-        const img = new Image();
-        img.src = data.rawImageSrc;
-        img.onload = async () => {
-          const cad = await processImageToCad(img, data.filterSettings || filterSettings);
-          setCadBackgroundImageUrl(cad);
-        };
-      }
-    }
-    setSelectedId(null);
-  }, [filterSettings]);
-
-  const handleLoadProjectJson = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.cadmap,.json';
-    input.onchange = e => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = event => {
-        try {
-          const data = JSON.parse(event.target?.result as string);
-          loadProjectData(data);
-        } catch (err) {
-          console.error('Archivo de proyecto inválido', err);
-          alert('El archivo no tiene un formato válido de proyecto Assur CAD (.cadmap)');
-        }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
-  };
-
-  // Handle drag-and-drop of .cadmap file onto canvas
-  const handleCadmapDropped = (file: File) => {
+  const readProjectFile = (file: File) => {
+    if (file.size > 40 * 1024 * 1024) { setNotice('El archivo supera 40 MB. Usa una copia con imágenes reducidas.'); return; }
     const reader = new FileReader();
     reader.onload = event => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        loadProjectData(data);
-      } catch (err) {
-        console.error('Archivo de proyecto inválido', err);
-      }
+      try { loadProjectData(JSON.parse(event.target?.result as string)); }
+      catch (err) { setNotice(err instanceof Error ? err.message : 'No se pudo abrir el proyecto. El plano actual se conserva.'); }
     };
+    reader.onerror = () => setNotice('No se pudo leer el archivo. Selecciónalo de nuevo.');
     reader.readAsText(file);
   };
+  const handleLoadProjectJson = () => {
+    const input = document.createElement('input'); input.type = 'file'; input.accept = '.cadmap,.json';
+    input.onchange = () => { const file = input.files?.[0]; if (file) readProjectFile(file); };
+    input.click();
+  };
+  const handleCadmapDropped = readProjectFile;
 
   // Handle direct image drop onto canvas
+  const [droppedImage, setDroppedImage] = useState<string | null>(null);
   const handleImageDropped = (file: File) => {
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 20 * 1024 * 1024) {
+      setNotice('Usa una imagen PNG, JPG o WebP de hasta 20 MB.'); return;
+    }
     const reader = new FileReader();
-    reader.onload = async event => {
-      const dataUrl = event.target?.result as string;
-      setRawImageSrc(dataUrl);
-      const img = new Image();
-      img.src = dataUrl;
-      img.onload = async () => {
-        const cadResult = await processImageToCad(img, filterSettings);
-        const detected = await autoVectorizeStructuresFromImage(dataUrl);
-        setCadBackgroundImageUrl(cadResult);
-        setStructures(detected);
-        setCameras([]);
-        setAudioAlarms([]);
-        setAntennas([]);
-        setFences([]);
-        setWiring([]);
-        setSelectedId(null);
-      };
+    reader.onload = async e => {
+      try { setDroppedImage(await prepareImage(e.target?.result as string)); setIsFilterModalOpen(true); }
+      catch { setNotice('No se pudo abrir la imagen. El plano actual se conserva.'); }
     };
+    reader.onerror = () => setNotice('No se pudo leer la imagen. Inténtalo de nuevo.');
     reader.readAsDataURL(file);
   };
 
@@ -635,7 +613,7 @@ export default function App() {
       Boolean(rawImageSrc) ||
       structures.length > 0 ||
       cameras.length > 0 ||
-      audioAlarms.length > 0;
+      audioAlarms.length > 0 || antennas.length > 0 || fences.length > 0 || wiring.length > 0 || annotations.length > 0;
 
     if (hasWork) {
       const confirmReset = window.confirm(
@@ -644,7 +622,9 @@ export default function App() {
       if (!confirmReset) return;
     }
 
-    localStorage.removeItem(AUTOSAVE_STORAGE_KEY);
+    commitSnapshot();
+    try { localStorage.removeItem(AUTOSAVE_STORAGE_KEY); } catch {}
+    setMetadata({ ...DEFAULT_METADATA });
     setRawImageSrc(null);
     setCadBackgroundImageUrl(null);
     setStructures([]);
@@ -656,6 +636,15 @@ export default function App() {
     setAnnotations([]);
     setSelectedId(null);
     setAutosaveStatus('idle');
+  };
+
+  const updateGlosa = (kind: EquipmentKind, id: string, glosa: string) => {
+    const update = (items: any[]) => items.map(item => item.id === id ? { ...item, glosa } : item);
+    if (kind === 'cameras') setCameras(update);
+    if (kind === 'antennas') setAntennas(update);
+    if (kind === 'audioAlarms') setAudioAlarms(update);
+    if (kind === 'fences') setFences(update);
+    if (kind === 'wiring') setWiring(update);
   };
 
   const totalDevicesCount =
@@ -676,6 +665,10 @@ export default function App() {
     <div className="flex flex-col w-screen h-screen overflow-hidden bg-stone-100 font-sans text-slate-800">
       {/* Cabecera Superior Redistribuida (Limpia y Espaciosa) */}
       <Toolbar
+        onOpenReport={() => setIsReportOpen(true)}
+        onCalibrate={() => { setActiveTool('measure'); setNotice('Marca dos puntos de distancia conocida con la herramienta Medir y completa la distancia real.'); }}
+        calibrated={Boolean(metadata.metersPerUnit)}
+        pdfFormat={pdfFormat} setPdfFormat={setPdfFormat} exporting={exporting}
         showFov={showFov}
         setShowFov={setShowFov}
         showGrid={showGrid}
@@ -706,8 +699,16 @@ export default function App() {
         isLayersOpen={isLayersOpen}
       />
 
+      <div className="px-3 py-1.5 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs shrink-0" role="status" aria-live="polite">
+        <span className={autosaveStatus === 'error' ? 'text-red-700 font-semibold' : autosaveStatus === 'partial' ? 'text-amber-800' : 'text-slate-600'}>
+          {autosaveStatus === 'saved' ? 'Guardado en este navegador' : autosaveStatus === 'saving' ? 'Guardando…' : autosaveStatus === 'error' ? 'No se pudo guardar o recuperar el respaldo. Descarga una copia .cadmap.' : autosaveStatus === 'partial' ? 'Respaldo parcial: falta la imagen original. Descarga una copia .cadmap.' : 'Guarda una copia .cadmap para conservar tu proyecto.'}
+        </span>
+        <button className="underline underline-offset-2 text-purple-800" onClick={() => setActiveTool('measure')}>{metadata.metersPerUnit ? 'Distancias calibradas · Medir / recalibrar' : 'Distancias sin calibrar · Calibrar'}</button>
+      </div>
+      {notice && <div role="status" className="px-3 py-2 bg-amber-50 text-amber-950 text-sm flex items-center gap-3 shrink-0"><span className="flex-1">{notice}</span><button aria-label="Cerrar aviso" onClick={() => setNotice('')} className="underline">Cerrar</button></div>}
+      {isReportOpen && <EquipmentReport project={{ metadata, cameras, antennas, audioAlarms, fences, wiring }} onClose={() => setIsReportOpen(false)} onUpdateGlosa={updateGlosa} onSelect={setSelectedId}/>}
       {/* Área Principal de Trabajo */}
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Costado Izquierdo en Columna: Opciones de Adición y Elementos */}
         <LeftToolPalette
           activeTool={activeTool}
@@ -794,6 +795,7 @@ export default function App() {
         />
 
         <PropertiesPanel
+        metersPerUnit={metadata.metersPerUnit}
           selectedId={selectedId}
           onClose={() => setSelectedId(null)}
           cameraPreset={cameraPreset}
@@ -835,28 +837,21 @@ export default function App() {
 
       <FilterModal
         isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
-        rawImageSrc={rawImageSrc}
+        onClose={() => { setIsFilterModalOpen(false); setDroppedImage(null); }}
+        rawImageSrc={droppedImage || rawImageSrc}
         setRawImageSrc={setRawImageSrc}
         filterSettings={filterSettings}
         setFilterSettings={setFilterSettings}
-        onApplyCadImage={(cadUrl, detectedStructures) => {
+        onApplyCadImage={(cadUrl, detectedStructures, source, settings) => {
+          const replacing = Boolean(rawImageSrc || cadBackgroundImageUrl) && source !== rawImageSrc;
+          if (replacing && !window.confirm('Cambiar la imagen puede desalinear equipos y trazados. Se conservarán sus posiciones y se quitará la calibración. ¿Continuar?')) return false;
           commitSnapshot();
-          setCadBackgroundImageUrl(cadUrl);
-          setTheme(filterSettings.theme);
-          setCameras([]);
-          setAudioAlarms([]);
-          setAntennas([]);
-          setFences([]);
-          setWiring([]);
-          setAnnotations([]);
-          setSelectedId(null);
-
-          if (detectedStructures && detectedStructures.length > 0) {
-            setStructures(detectedStructures);
-          } else {
-            setStructures([]);
-          }
+          setRawImageSrc(source); setCadBackgroundImageUrl(cadUrl);
+          setFilterSettings(settings); setTheme(settings.theme);
+          if (replacing) setMetadata(prev => ({ ...prev, metersPerUnit: undefined, scale: 'S/E' }));
+          if (detectedStructures?.length && (source !== rawImageSrc || structures.length === 0)) setStructures(prev => [...prev, ...detectedStructures]);
+          setDroppedImage(null);
+          return true;
         }}
       />
 

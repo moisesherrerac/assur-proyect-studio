@@ -1,3 +1,4 @@
+import { prepareImage } from '../utils/images';
 import React, { useState, useEffect } from 'react';
 import { ImageFilterSettings, CadTheme, CadStructure } from '../types/cad';
 import { processImageToCad } from '../utils/cadFilter';
@@ -25,7 +26,7 @@ interface FilterModalProps {
   setRawImageSrc: (src: string | null) => void;
   filterSettings: ImageFilterSettings;
   setFilterSettings: React.Dispatch<React.SetStateAction<ImageFilterSettings>>;
-  onApplyCadImage: (cadDataUrl: string, detectedStructures?: CadStructure[]) => void;
+  onApplyCadImage: (cadDataUrl: string, detectedStructures: CadStructure[], source: string, settings: ImageFilterSettings) => boolean | void;
 }
 
 export const FilterModal: React.FC<FilterModalProps> = ({
@@ -37,24 +38,29 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   setFilterSettings,
   onApplyCadImage
 }) => {
+  const [draftImage, setDraftImage] = useState(rawImageSrc);
+  const [error, setError] = useState('');
+  const [applying, setApplying] = useState(false);
   const [localSettings, setLocalSettings] = useState<ImageFilterSettings>(filterSettings);
   const [previewCadUrl, setPreviewCadUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [sampleMaps, setSampleMaps] = useState<SampleMap[]>([]);
   const [activeTab, setActiveTab] = useState<'upload' | 'samples' | 'tune'>('upload');
-  const [autoTraceStructures, setAutoTraceStructures] = useState<boolean>(true);
+  const [autoTraceStructures, setAutoTraceStructures] = useState<boolean>(false);
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
   const [detectedPreviewStructures, setDetectedPreviewStructures] = useState<CadStructure[]>([]);
 
   useEffect(() => {
     if (isOpen) {
+      setDraftImage(rawImageSrc);
+      setError(''); setPreviewCadUrl(null); setAutoTraceStructures(false);
       setSampleMaps(getPresetSampleMaps());
       setLocalSettings(filterSettings);
     }
-  }, [isOpen, filterSettings]);
+  }, [isOpen, rawImageSrc]);
 
   useEffect(() => {
-    if (!rawImageSrc) return;
+    if (!draftImage || !isOpen) return;
 
     let isMounted = true;
     setIsProcessing(true);
@@ -62,12 +68,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     const timer = setTimeout(async () => {
       try {
         const img = new Image();
-        img.src = rawImageSrc;
+        img.src = draftImage;
         await img.decode();
-        const cadResult = await processImageToCad(img, localSettings, 950, 620);
+        const cadResult = await processImageToCad(img, localSettings);
         let structs: CadStructure[] = [];
         if (autoTraceStructures) {
-          structs = await autoVectorizeStructuresFromImage(rawImageSrc);
+          structs = await autoVectorizeStructuresFromImage(draftImage);
         }
         if (isMounted) {
           setPreviewCadUrl(cadResult);
@@ -76,7 +82,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         }
       } catch (err) {
         console.error('Error filtering image', err);
-        if (isMounted) setIsProcessing(false);
+        if (isMounted) { setIsProcessing(false); setPreviewCadUrl(null); setError('No se pudo procesar la imagen. Usa un archivo PNG, JPG o WebP válido.'); }
       }
     }, 90);
 
@@ -84,18 +90,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [rawImageSrc, localSettings, autoTraceStructures, selectedSampleId]);
+  }, [draftImage, localSettings, autoTraceStructures, selectedSampleId, isOpen]);
 
   if (!isOpen) return null;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 20 * 1024 * 1024) { setError('Usa PNG, JPG o WebP de hasta 20 MB.'); return; }
     const reader = new FileReader();
-    reader.onload = event => {
+    reader.onload = async event => {
       const result = event.target?.result as string;
       setSelectedSampleId(null);
-      setRawImageSrc(result);
+      try { setDraftImage(await prepareImage(result)); setError(''); } catch { setError('No se pudo abrir la imagen.'); }
       setActiveTab('tune');
     };
     reader.readAsDataURL(file);
@@ -109,9 +116,9 @@ export const FilterModal: React.FC<FilterModalProps> = ({
         const blob = items[i].getAsFile();
         if (blob) {
           const reader = new FileReader();
-          reader.onload = event => {
+          reader.onload = async event => {
             setSelectedSampleId(null);
-            setRawImageSrc(event.target?.result as string);
+            try { setDraftImage(await prepareImage(event.target?.result as string)); setError(''); } catch { setError('No se pudo pegar la imagen.'); }
             setActiveTab('tune');
           };
           reader.readAsDataURL(blob);
@@ -122,21 +129,23 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   };
 
   const handleApply = async () => {
-    setFilterSettings(localSettings);
-    if (rawImageSrc) {
-      const img = new Image();
-      img.src = rawImageSrc;
-      await img.decode();
+    if (!draftImage || isProcessing || applying) return;
+    setApplying(true); setError('');
+    try {
+      const img = new Image(); img.src = draftImage; await img.decode();
       const fullCad = await processImageToCad(img, localSettings);
-      onApplyCadImage(fullCad, autoTraceStructures ? detectedPreviewStructures : []);
-    }
-    onClose();
+      const accepted = onApplyCadImage(fullCad, autoTraceStructures ? detectedPreviewStructures : [], draftImage, localSettings);
+      if (accepted !== false) onClose();
+    } catch { setError('No se pudo aplicar la imagen. El plano anterior se conserva.'); }
+    finally { setApplying(false); }
   };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4"
+      role="dialog" aria-modal="true" aria-label="Cargar imagen y ajustar filtros"
       onPaste={handlePaste}
+      onKeyDown={e => { e.stopPropagation(); if (e.key === 'Escape') onClose(); }}
     >
       <div className="bg-white border border-stone-200 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] text-slate-800">
         {/* Header */}
@@ -150,12 +159,13 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                 Importar Captura de Google Maps a Plano de Planta CAD
               </h3>
               <p className="text-xs text-slate-500">
-                El plano se carga limpio (sin cámaras precargadas) y con estructuras editables para que ubiques tus equipos uno a uno
+                Ajusta la imagen base conservando los equipos del plano. El trazado de construcciones es opcional.
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
+            aria-label="Cerrar importador"
             className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-stone-200/60 cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -212,10 +222,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               <div className="text-xs">
                 <div className="font-bold text-sky-900 flex items-center gap-1.5">
                   <Pentagon className="w-3.5 h-3.5 text-sky-600" />
-                  <span>Trazar Perímetros y Estructuras Editables</span>
+                  <span>Intentar detectar construcciones (opcional)</span>
                 </div>
                 <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
-                  Superpone líneas CAD de deslinde perimetral y estructuras de construcción para editar sus esquinas.
+                  Intenta detectar construcciones por contraste. Revisa los contornos antes de usarlos; no determina deslindes reales.
                 </p>
               </div>
             </label>
@@ -245,10 +255,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
                 <div className="bg-stone-50 p-3.5 rounded-xl border border-stone-200 text-[11px] text-slate-600 space-y-1">
                   <div className="font-bold text-slate-800">
-                    Lienzo Limpio sin Cámaras Precargadas:
+                    Equipos y trazados existentes:
                   </div>
                   <p className="leading-relaxed">
-                    Al aplicar tu plano, se carga sin equipos preubicados para que puedas ir situando tus cámaras una a una con el color y criterio que elijas.
+                    Aplicar filtros conserva los elementos actuales. Si reemplazas la imagen, revisa su alineación y vuelve a calibrar las distancias.
                   </p>
                 </div>
               </div>
@@ -257,14 +267,14 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             {activeTab === 'samples' && (
               <div className="space-y-2.5">
                 <span className="text-xs font-bold uppercase tracking-wide text-slate-500">
-                  Seleccionar Planta Base (Se cargará sin cámaras):
+                  Seleccionar imagen de ejemplo:
                 </span>
                 {sampleMaps.map(sample => (
                   <div
                     key={sample.id}
                     onClick={() => {
                       setSelectedSampleId(sample.id);
-                      setRawImageSrc(sample.dataUrl);
+                      setDraftImage(sample.dataUrl);
                       setActiveTab('tune');
                     }}
                     className="p-3 bg-stone-50 border border-stone-200 hover:border-sky-400 rounded-xl cursor-pointer transition-all group"
@@ -406,6 +416,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
           </div>
         </div>
 
+        {error && <p role="alert" className="px-6 py-2 text-sm text-red-700">{error}</p>}
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-stone-200 bg-stone-50">
           <span className="text-xs text-slate-500">
@@ -420,11 +431,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </button>
             <button
               onClick={handleApply}
-              disabled={!previewCadUrl}
+              disabled={!previewCadUrl || isProcessing || applying}
               className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer transition-all"
             >
               <Check className="w-4 h-4" />
-              <span>Cargar Plano Limpio (Sin Cámaras Precargadas)</span>
+              <span>{applying ? 'Aplicando…' : 'Aplicar imagen y filtros'}</span>
             </button>
           </div>
         </div>

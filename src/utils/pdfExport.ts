@@ -1,4 +1,5 @@
-import { jsPDF } from 'jspdf';
+
+import { safeFilename } from './project';
 import {
   CameraDevice,
   ElectricFence,
@@ -28,6 +29,7 @@ export async function exportCadBlueprintToPdf(options: ExportPdfOptions): Promis
   const docWidth = isA3 ? 420 : 297;
   const docHeight = isA3 ? 297 : 210;
 
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({
     orientation: 'landscape',
     unit: 'mm',
@@ -48,5 +50,5 @@ export async function exportCadBlueprintToPdf(options: ExportPdfOptions): Promis
   const cleanFilename = (metadata.projectName || 'Plano_Planta_General_CCTV')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '_');
-  doc.save(`${cleanFilename}_${metadata.sheetNumber || 'L-01'}.pdf`);
+  doc.save(`${safeFilename(metadata.projectName)}_${safeFilename(metadata.sheetNumber || 'L-01')}_rev_${safeFilename(metadata.revision)}.pdf`);
 }

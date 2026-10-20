@@ -15,6 +15,7 @@ export type DeviceType =
 export type CameraStatus = 'nueva' | 'existente' | 'reubicar' | 'baja';
 
 export interface CameraDevice {
+  glosa?: string;
   id: string;
   type: DeviceType;
   x: number;
@@ -43,6 +44,7 @@ export interface CameraInsertionPreset {
 }
 
 export interface NetworkAntenna {
+  glosa?: string;
   id: string;
   type: 'antenna-ptp' | 'antenna-omni';
   x: number;
@@ -59,6 +61,7 @@ export interface NetworkAntenna {
 }
 
 export interface AudioAlarmDevice {
+  glosa?: string;
   id: string;
   type: 'speaker-horn' | 'siren-strobe' | 'rack-cabinet' | 'pir-sensor' | 'access-control';
   x: number;
@@ -106,6 +109,7 @@ export interface CadStructure {
 }
 
 export interface ElectricFence {
+  glosa?: string;
   id: string;
   points: FencePoint[];
   label: string;
@@ -120,6 +124,7 @@ export interface ElectricFence {
 export type WireType = 'conduit-emt' | 'conduit-pvc' | 'utp-cat6' | 'fibra-optica' | 'energia-ac';
 
 export interface WiringRoute {
+  glosa?: string;
   id: string;
   points: FencePoint[];
   wireType: WireType;
@@ -170,6 +175,7 @@ export interface ImageFilterSettings {
 }
 
 export interface ProjectMetadata {
+  metersPerUnit?: number;
   projectName: string;
   clientName: string;
   location: string;

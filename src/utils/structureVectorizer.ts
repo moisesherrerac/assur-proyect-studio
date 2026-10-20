@@ -130,7 +130,7 @@ export async function autoVectorizeStructuresFromImage(
   canvas.height = gridH;
   const ctx = canvas.getContext('2d');
   if (!ctx) {
-    return generateFittedStructuresForPlan(img.width, img.height);
+    return [];
   }
 
   // Draw full image scaled to analyze grid
@@ -152,28 +152,6 @@ export async function autoVectorizeStructuresFromImage(
 
   const visited = new Uint8Array(gridW * gridH);
   const detectedStructures: CadStructure[] = [];
-
-  // 1. Always create the outer property perimeter polygon adapted to the exact attached plan image
-  const padX = Math.round(bounds.w * 0.04);
-  const padY = Math.round(bounds.h * 0.04);
-  detectedStructures.push({
-    id: `struct-perim-${Date.now()}`,
-    type: 'perimeter',
-    label: 'PERÍMETRO PREDIAL / DESLINDE',
-    closed: true,
-    strokeColor: '#0f172a',
-    strokeWidth: 2.8,
-    lineStyle: 'dash-dot',
-    fillOpacity: 0.03,
-    hatchPattern: 'none',
-    showDimensions: true,
-    points: [
-      { x: bounds.x + padX, y: bounds.y + padY },
-      { x: bounds.x + bounds.w - padX, y: bounds.y + padY },
-      { x: bounds.x + bounds.w - padX, y: bounds.y + bounds.h - padY },
-      { x: bounds.x + padX, y: bounds.y + bounds.h - padY }
-    ]
-  });
 
   // 2. Connected components for distinct roof/construction structures
   const threshold = Math.min(220, meanLum + 22);
@@ -279,8 +257,8 @@ export async function autoVectorizeStructuresFromImage(
   }
 
   // If no distinct roof structures were found via luminance, provide a tailored architectural framing
-  if (detectedStructures.length <= 1) {
-    return generateFittedStructuresForPlan(img.width, img.height);
+  if (detectedStructures.length === 0) {
+    return [];
   }
 
   return detectedStructures;

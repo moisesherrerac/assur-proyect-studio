@@ -116,3 +116,15 @@ npm run preview
 ## 📄 Licencia
 
 Este proyecto está bajo la licencia **MIT** - eres libre de usarlo, modificarlo, distribuirlo y utilizarlo de forma comercial o personal de manera 100% gratuita. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+
+## Mejoras prácticas e informe complementario (v2)
+
+- **Informe de equipos:** abre el botón de la cabecera. Cada elemento conserva el código del plano y una glosa editable. Puedes descargar un PDF A4 con resumen y detalle, o un CSV compatible con Excel. La glosa queda guardada en el .cadmap y en el respaldo local.
+- **Cantidades:** los equipos se cuentan en unidades; cercos y canalizaciones se listan como tramos hasta calibrar el plano. Después se muestra la longitud de la ruta dibujada en metros, sin reservas, holguras ni subidas. Se incluyen todas las capas, incluso ocultas. Corrige los códigos vacíos o repetidos antes de exportar.
+- **Calibración:** elige Medir o Calibrar, marca dos puntos de distancia conocida e ingresa los metros reales. El factor se conserva con el proyecto. La escala de impresión permanece S/E y debe verificarse por separado.
+- **Imágenes:** ajustar filtros conserva los equipos. Cambiar la imagen solicita confirmación por posible desalineación y quita la calibración anterior. Cancelar no aplica los cambios. La detección opcional de construcciones no agrega figuras genéricas si no encuentra contornos.
+- **Guardado:** Guardar copia descarga el editable .cadmap. El respaldo automático corresponde solo al navegador actual y avisa si es parcial o si no pudo guardarse. Abrir otro archivo valida sus datos y reemplaza el proyecto completo.
+- **Entrega:** Plano PDF permite A3/A4. El informe de equipos es un PDF separado. Completa proyecto, cliente, revisión y responsable en Viñeta antes de entregar documentos.
+- **Resumen técnico:** cálculo local con supuestos editables de tasa de bits, retención, horas y consumo PoE; no verifica cobertura ni sustituye las fichas de los equipos.
+
+Validación del proyecto: `npm run lint`, `npm test` y `npm run build`. GitHub Actions ejecuta las tres comprobaciones antes de publicar.

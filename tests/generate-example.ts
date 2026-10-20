@@ -1,0 +1,10 @@
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { createEquipmentPdf, equipmentCsv } from '../src/utils/equipmentReport';
+import { example } from './fixture';
+const dir=process.argv[2] || 'output/assur-mejoras-20261020';
+mkdirSync(dir,{recursive:true});
+const doc=await createEquipmentPdf(example);
+writeFileSync(`${dir}/ejemplo-informe-equipos-v2.pdf`,new Uint8Array(doc.output('arraybuffer')));
+writeFileSync(`${dir}/ejemplo-informe-equipos-v2.csv`,equipmentCsv(example));
+writeFileSync(`${dir}/ejemplo-plano-v2.cadmap`,JSON.stringify({...example,appName:'Assur Proyect Studio',version:'2.4',annotations:[],structures:[],rawImageSrc:null,cadBackgroundImageUrl:null},null,2));
+console.log(`Informe de ejemplo: ${doc.getNumberOfPages()} páginas, 8 elementos.`);

@@ -1,4 +1,5 @@
 import React from 'react';
+import { distanceLabel } from '../utils/project';
 import {
   CameraDevice,
   DeviceType,
@@ -33,6 +34,7 @@ import {
 } from 'lucide-react';
 
 interface PropertiesPanelProps {
+  metersPerUnit?: number;
   selectedId: string | null;
   onClose: () => void;
   cameraPreset: CameraInsertionPreset;
@@ -63,6 +65,7 @@ const STRUCTURE_COLORS = [
 ];
 
 export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
+  metersPerUnit,
   selectedId,
   onClose,
   setCameraPreset,
@@ -131,7 +134,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     for (let i = 0; i < segCount; i++) {
       const p1 = pts[i];
       const p2 = pts[(i + 1) % pts.length];
-      structPerimeterMeters += Math.hypot(p2.x - p1.x, p2.y - p1.y) * 0.1;
+      structPerimeterMeters += Math.hypot(p2.x - p1.x, p2.y - p1.y);
     }
   }
 
@@ -375,7 +378,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                 Vértices: <strong className="text-slate-900">{currentStruct.points.length}</strong>
               </span>
               <span className="text-sky-700 font-semibold">
-                Perímetro: <strong>{structPerimeterMeters.toFixed(1)} m</strong>
+                Perímetro: <strong>{distanceLabel(structPerimeterMeters, metersPerUnit)}</strong>
               </span>
             </div>
 
@@ -563,7 +566,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
               <div>
                 <div className="flex justify-between text-[11px] text-slate-600 mb-1">
                   <span>Alcance de Cono Visual</span>
-                  <span className="font-mono">{currentCam.range} px</span>
+                  <span className="font-mono">{distanceLabel(currentCam.range, metersPerUnit)} (referencial)</span>
                 </div>
                 <input
                   type="range"
