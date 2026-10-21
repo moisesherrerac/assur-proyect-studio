@@ -31,7 +31,7 @@
 
 La app publicada requiere una clave de acceso detallada de GitHub (fine-grained personal access token). El código de GitHub Pages sigue siendo público; la autorización real para leer o escribir planos la aplica GitHub sobre el repositorio **privado** `moisesherrerac/assur-planos-privados`. La pantalla de acceso no convierte el código público en privado.
 
-1. En la pantalla inicial abre **Crear mi clave de acceso** y sigue el enlace a GitHub.
+1. Para generar o renovar el acceso, abre [las claves detalladas de GitHub](https://github.com/settings/personal-access-tokens). La pantalla de inicio de la app solo solicita la clave existente.
 2. Selecciona **Only select repositories**, únicamente **assur-planos-privados**.
 3. En **Repository permissions**, deja **Contents: Read and write**, y establece una fecha de vencimiento. GitHub añade Metadata de lectura automáticamente.
 4. Genera la clave tú mismo, consérvala en tu gestor de contraseñas y pégala solo en la pantalla de la app. No la envíes por chat ni la agregues al repositorio.
