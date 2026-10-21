@@ -2520,7 +2520,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 Adjunta tu Plano o Captura para Comenzar
               </h2>
               <p className="text-xs text-slate-500 leading-relaxed">
-                El encuadre y las estructuras se adaptarán exactamente a las dimensiones de tu imagen. Podrás ubicar cámaras una a una y tu avance se guardará automáticamente.
+                El encuadre y las estructuras se adaptarán exactamente a las dimensiones de tu imagen. Podrás ubicar cámaras una a una. Guarda en Mis planos para conservar el proyecto entre computadores.
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-1">

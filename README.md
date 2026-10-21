@@ -1,6 +1,6 @@
 # Assur Proyect Studio 📐
 
-> Estudio profesional de diseño técnico y convertidor de planos de seguridad electrónica, telecomunicaciones y videovigilancia estilo AutoCAD. 100% gratuito y de código abierto.
+> Estudio profesional de diseño técnico y convertidor de planos de seguridad electrónica, telecomunicaciones y videovigilancia estilo AutoCAD. Código abierto, con biblioteca privada de planos en GitHub.
 
 ---
 
@@ -23,9 +23,25 @@
   - **Distribución Ergonómica:** Barra lateral izquierda para selección rápida de elementos y panel de ingeniería flotante/plegable para propiedades de dispositivos.
   - **Cálculo Automático de Almacenamiento & Red:** Estimación en tiempo real de ancho de banda (Mbps) y capacidad de almacenamiento en disco (TB) según resolución, FPS, códec (H.264/H.265) y días de retención.
   - **Exportación en Alta Definición:** Generación de planos en PDF vectorial con membrete profesional (Title Block), fecha, escala y especificaciones técnicas.
-  - **Persistencia Local:** Guardado y carga de proyectos completos en formato JSON sin necesidad de servidor.
+  - **Mis planos:** Biblioteca privada en GitHub con carpetas, búsqueda, guardado manual y archivo reversible; copias editables `.cadmap`.
 
 ---
+
+## Acceso y biblioteca privada
+
+La app publicada requiere una clave de acceso detallada de GitHub (fine-grained personal access token). El código de GitHub Pages sigue siendo público; la autorización real para leer o escribir planos la aplica GitHub sobre el repositorio **privado** `moisesherrerac/assur-planos-privados`. La pantalla de acceso no convierte el código público en privado.
+
+1. En la pantalla inicial abre **Crear mi clave de acceso** y sigue el enlace a GitHub.
+2. Selecciona **Only select repositories**, únicamente **assur-planos-privados**.
+3. En **Repository permissions**, deja **Contents: Read and write**, y establece una fecha de vencimiento. GitHub añade Metadata de lectura automáticamente.
+4. Genera la clave tú mismo, consérvala en tu gestor de contraseñas y pégala solo en la pantalla de la app. No la envíes por chat ni la agregues al repositorio.
+5. En **Mis planos**, indica un nombre y una carpeta y pulsa **Guardar nuevo plano** o **Guardar cambios**. Desde otro computador, entra con la clave y abre el plano desde esa biblioteca.
+
+La clave se mantiene solo en memoria de la pestaña, nunca en `localStorage`, `sessionStorage`, archivos o registros. Recargar requiere iniciar sesión otra vez. Tras 30 minutos sin interacción la sesión se bloquea. **Vista y opciones → Cerrar sesión** elimina la clave y el borrador temporal de esta pestaña. Puedes revocar o renovar la clave desde GitHub.
+
+Los cambios se suben únicamente al pulsar Guardar en Mis planos. El borrador de trabajo usa `sessionStorage`, es temporal, queda en ese navegador y puede estar incompleto si las imágenes exceden su cuota. Guarda en GitHub antes de cerrar y conserva una copia `.cadmap` cuando sea necesario. El respaldo local anterior se mantiene intacto y puede recuperarse desde Mis planos, sin subirlo automáticamente.
+
+La biblioteca admite planos de hasta **20 MB**. Archivar conserva el archivo y el historial; se recupera con **Ver archivados → Restaurar**. Al detectar cambios desde otro equipo, la app impide sobrescribir y permite abrir la versión actual o guardar una copia. El índice y el plano se publican juntos en un solo commit, sin forzar cambios de rama. No hay servidor adicional ni clave de Gemini para esta función.
 
 ## Publicación y uso
 

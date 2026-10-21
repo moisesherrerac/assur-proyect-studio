@@ -37,10 +37,14 @@ import { EngineerSignatureModal } from './components/EngineerSignatureModal';
 import { AIAssistantModal } from './components/AIAssistantModal';
 import { LayerManagerPanel } from './components/LayerManagerPanel';
 
-const AUTOSAVE_STORAGE_KEY = 'cad_project_autosave_v2';
+import { PlanLibrary } from './components/PlanLibrary';
+import type { PlanLibrary as Library, SavedPlan } from './utils/githubPlans';
+import { PRIVATE_DRAFT_KEY } from './utils/privateSession';
+const AUTOSAVE_STORAGE_KEY = PRIVATE_DRAFT_KEY;
 const MAX_HISTORY = 60;
 
 interface ProjectSnapshot {
+  cloudEntry?: SavedPlan;
   structures: CadStructure[];
   cameras: CameraDevice[];
   audioAlarms: AudioAlarmDevice[];
@@ -95,12 +99,12 @@ const DEFAULT_PRESET: CameraInsertionPreset = {
   prefix: 'CN'
 };
 
-export default function App() {
+export default function App({ library, onSignOut, onAccessLost }: { library: Library; onSignOut: () => void; onAccessLost: () => void }) {
   // Read existing autosave from localStorage if available
   const [initialSavedData] = useState(() => {
     try {
-      const raw = localStorage.getItem(AUTOSAVE_STORAGE_KEY);
-      if (raw) return validateProject(JSON.parse(raw));
+      const raw = sessionStorage.getItem(AUTOSAVE_STORAGE_KEY);
+      if (raw) { const saved = JSON.parse(raw); return { ...validateProject(saved), cloudEntry: saved.cloudEntry as SavedPlan | undefined }; }
     } catch (e) {
       console.warn('No se pudo recuperar autoguardado previo', e);
       return { recoveryError: true };
@@ -108,6 +112,8 @@ export default function App() {
     return null;
   });
 
+  const [cloudEntry, setCloudEntry] = useState<SavedPlan | undefined>(initialSavedData && !initialSavedData.recoveryError ? initialSavedData.cloudEntry : undefined);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<ActiveTool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -218,6 +224,7 @@ export default function App() {
   const [canRedo, setCanRedo] = useState(false);
 
   const getCurrentSnapshot = useCallback((): ProjectSnapshot => ({
+    cloudEntry,
     structures: JSON.parse(JSON.stringify(structures)),
     cameras: JSON.parse(JSON.stringify(cameras)),
     audioAlarms: JSON.parse(JSON.stringify(audioAlarms)),
@@ -238,7 +245,7 @@ export default function App() {
     annotations,
     metadata,
     cadBackgroundImageUrl,
-    rawImageSrc, filterSettings, theme
+    rawImageSrc, filterSettings, theme, cloudEntry
   ]);
 
   const areSnapshotsEqual = (a: ProjectSnapshot, b: ProjectSnapshot): boolean => {
@@ -318,6 +325,7 @@ export default function App() {
     isApplyingHistoryRef.current = true;
     lastCommittedSnapshotRef.current = previous;
 
+    setCloudEntry(previous.cloudEntry);
     setStructures(previous.structures || []);
     setCameras(previous.cameras || []);
     setAudioAlarms(previous.audioAlarms || []);
@@ -350,6 +358,7 @@ export default function App() {
     isApplyingHistoryRef.current = true;
     lastCommittedSnapshotRef.current = next;
 
+    setCloudEntry(next.cloudEntry);
     setStructures(next.structures || []);
     setCameras(next.cameras || []);
     setAudioAlarms(next.audioAlarms || []);
@@ -416,6 +425,7 @@ export default function App() {
     const timer = setTimeout(() => {
       try {
         const payload = {
+          cloudEntry,
           version: '2.4',
           timestamp: new Date().toISOString(),
           metadata,
@@ -434,13 +444,14 @@ export default function App() {
           locks,
           cameraPreset
         };
-        localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(payload));
+        sessionStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(payload));
         setAutosaveStatus('saved');
       } catch (err) {
         console.warn('Autosave quota exceeded for raw image, trying compact payload', err);
         try {
           const compactPayload = {
-            version: '2.4',
+            cloudEntry,
+          version: '2.4',
             timestamp: new Date().toISOString(),
             metadata,
             filterSettings,
@@ -457,7 +468,7 @@ export default function App() {
             locks,
             cameraPreset
           };
-          localStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(compactPayload));
+          sessionStorage.setItem(AUTOSAVE_STORAGE_KEY, JSON.stringify(compactPayload));
           setAutosaveStatus('partial');
         } catch (err2) {
           setAutosaveStatus('error');
@@ -481,7 +492,7 @@ export default function App() {
     cadBackgroundImageUrl,
     layers,
     locks,
-    cameraPreset
+    cameraPreset, cloudEntry
   ]);
 
   const handleThemeChange = async (newTheme: CadTheme) => {
@@ -521,8 +532,7 @@ export default function App() {
   };
 
   // Download complete editable project file (.cadmap)
-  const handleSaveProjectJson = () => {
-    const projectData = {
+  const getProjectData = () => ({
       version: '2.4',
       appName: 'Assur Proyect Studio',
       timestamp: new Date().toISOString(),
@@ -541,8 +551,9 @@ export default function App() {
       layers,
       locks,
       cameraPreset
-    };
-    const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+    });
+  const handleSaveProjectJson = () => {
+    const blob = new Blob([JSON.stringify(getProjectData(), null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -556,10 +567,11 @@ export default function App() {
   };
 
   // Load project file from file object (.cadmap or .json)
-  const loadProjectData = useCallback((input: unknown) => {
+  const loadProjectData = useCallback((input: unknown, entry?: SavedPlan) => {
     const data = validateProject(input);
-    if (!window.confirm('Se abrirá otro proyecto y se reemplazará el plano actual. ¿Guardaste una copia .cadmap de tu trabajo?')) return;
+    if (!window.confirm('Se abrirá otro proyecto y se reemplazará el plano actual. ¿Guardaste tu trabajo en Mis planos o descargaste una copia?')) return false;
     commitSnapshot();
+    setCloudEntry(entry);
     setMetadata(cleanSampleIdentity({ ...DEFAULT_METADATA, ...data.metadata }));
     setStructures(data.structures || []); setCameras(data.cameras || []);
     setAntennas(data.antennas || []); setAudioAlarms(data.audioAlarms || []);
@@ -572,7 +584,8 @@ export default function App() {
     setCadBackgroundImageUrl(data.cadBackgroundImageUrl || data.rawImageSrc || null);
     setRawImageSrc(data.rawImageSrc || null); setSelectedId(null);
     hasSavedWorkRef.current = true;
-    setNotice('Proyecto abierto. El autoguardado pertenece a este navegador; conserva una copia .cadmap.');
+    setNotice('Proyecto abierto. Guarda los cambios en Mis planos para acceder a ellos desde otro computador.');
+    return true;
   }, [commitSnapshot]);
 
   const readProjectFile = (file: File) => {
@@ -623,7 +636,8 @@ export default function App() {
     }
 
     commitSnapshot();
-    try { localStorage.removeItem(AUTOSAVE_STORAGE_KEY); } catch {}
+    try { sessionStorage.removeItem(AUTOSAVE_STORAGE_KEY); } catch {}
+    setCloudEntry(undefined);
     setMetadata({ ...DEFAULT_METADATA });
     setRawImageSrc(null);
     setCadBackgroundImageUrl(null);
@@ -665,6 +679,8 @@ export default function App() {
     <div className="flex flex-col w-screen h-screen overflow-hidden bg-stone-100 font-sans text-slate-800">
       {/* Cabecera Superior Redistribuida (Limpia y Espaciosa) */}
       <Toolbar
+        onOpenLibrary={() => setLibraryOpen(true)}
+        onSignOut={() => { if (window.confirm('¿Cerrar sesión? Guarda primero en Mis planos o descarga una copia. Se eliminará el borrador temporal de esta pestaña.')) onSignOut(); }}
         onOpenReport={() => setIsReportOpen(true)}
         onCalibrate={() => { setActiveTool('measure'); setNotice('Marca dos puntos de distancia conocida con la herramienta Medir y completa la distancia real.'); }}
         calibrated={Boolean(metadata.metersPerUnit)}
@@ -701,11 +717,16 @@ export default function App() {
 
       <div className="px-3 py-1.5 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs shrink-0" role="status" aria-live="polite">
         <span className={autosaveStatus === 'error' ? 'text-red-700 font-semibold' : autosaveStatus === 'partial' ? 'text-amber-800' : 'text-slate-600'}>
-          {autosaveStatus === 'saved' ? 'Guardado en este navegador' : autosaveStatus === 'saving' ? 'Guardando…' : autosaveStatus === 'error' ? 'No se pudo guardar o recuperar el respaldo. Descarga una copia .cadmap.' : autosaveStatus === 'partial' ? 'Respaldo parcial: falta la imagen original. Descarga una copia .cadmap.' : 'Guarda una copia .cadmap para conservar tu proyecto.'}
+          {autosaveStatus === 'saved' ? 'Borrador temporal en esta pestaña' : autosaveStatus === 'saving' ? 'Guardando borrador…' : autosaveStatus === 'error' ? 'No se pudo guardar o recuperar el respaldo. Descarga una copia .cadmap.' : autosaveStatus === 'partial' ? 'Respaldo parcial: falta la imagen original. Descarga una copia .cadmap.' : 'Guarda en Mis planos para conservar tu proyecto en GitHub privado.'}
         </span>
+        <span>{cloudEntry ? `Último guardado en GitHub: ${new Date(cloudEntry.updatedAt).toLocaleString('es-CL')} · ${cloudEntry.name}` : 'Sin guardar en GitHub'}</span>
         <button className="underline underline-offset-2 text-purple-800" onClick={() => setActiveTool('measure')}>{metadata.metersPerUnit ? 'Distancias calibradas · Medir / recalibrar' : 'Distancias sin calibrar · Calibrar'}</button>
       </div>
       {notice && <div role="status" className="px-3 py-2 bg-amber-50 text-amber-950 text-sm flex items-center gap-3 shrink-0"><span className="flex-1">{notice}</span><button aria-label="Cerrar aviso" onClick={() => setNotice('')} className="underline">Cerrar</button></div>}
+      {libraryOpen && <PlanLibrary library={library} current={cloudEntry} getDocument={getProjectData} onSaved={setCloudEntry} onOpen={loadProjectData} onClose={() => setLibraryOpen(false)} onAccessLost={onAccessLost} onRecoverLegacy={() => {
+        try { const raw = localStorage.getItem('cad_project_autosave_v2'); if (!raw) { setNotice('No hay un respaldo local de la versión anterior en este navegador.'); return; } loadProjectData(JSON.parse(raw)); }
+        catch { setNotice('No se pudo recuperar el respaldo anterior. Sus datos se conservan sin cambios.'); }
+      }}/>}
       {isReportOpen && <EquipmentReport project={{ metadata, cameras, antennas, audioAlarms, fences, wiring }} onClose={() => setIsReportOpen(false)} onUpdateGlosa={updateGlosa} onSelect={setSelectedId}/>}
       {/* Área Principal de Trabajo */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative">

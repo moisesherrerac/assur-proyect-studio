@@ -3,6 +3,7 @@ import type { CadTheme } from '../types/cad';
 import { AssurLogo } from './AssurLogo';
 import { Save, FolderOpen, Upload, Undo2, Redo2, FileDown, FileText, ChevronDown, Ruler } from 'lucide-react';
 interface ToolbarProps {
+  onOpenLibrary: () => void; onSignOut: () => void;
   showFov: boolean; setShowFov: (value: boolean) => void;
   showGrid: boolean; setShowGrid: (value: boolean) => void;
   snapToGrid: boolean; setSnapToGrid: (value: boolean) => void;
@@ -22,6 +23,7 @@ export const Toolbar: React.FC<ToolbarProps> = p => {
   return <header className="bg-white border-b border-stone-200 px-3 py-2 z-40 text-slate-800 shrink-0">
     <div className="flex flex-wrap items-center gap-2">
       <div className="flex items-center gap-2 mr-2"><AssurLogo className="w-7 h-7"/><span className="font-bold text-sm hidden sm:inline">Assur Proyect Studio</span></div>
+      <button className="action-button primary" onClick={p.onOpenLibrary}><FolderOpen size={16}/>Mis planos</button>
       <button className="action-button" onClick={p.onOpenConvertModal}><Upload size={16}/>{p.hasPlanImage ? 'Imagen / filtros' : 'Cargar plano'}</button>
       <button className="action-button" onClick={p.onLoadProjectJson}><FolderOpen size={16}/>Abrir</button>
       <button className="action-button" onClick={p.onSaveProjectJson} title="Descargar copia editable .cadmap"><Save size={16}/>Guardar copia</button>
@@ -44,6 +46,7 @@ export const Toolbar: React.FC<ToolbarProps> = p => {
           <button className="action-button w-full" onClick={()=>{p.onCalibrate();setViewOpen(false);}}><Ruler size={16}/>{p.calibrated ? 'Recalibrar distancia' : 'Calibrar distancia'}</button>
           <button className="action-button w-full" onClick={()=>{p.onOpenAiAssistant();setViewOpen(false);}}>Resumen técnico</button>
           <button className="action-button w-full text-red-700" onClick={()=>{p.onNewProject?.();setViewOpen(false);}}>Nuevo proyecto</button>
+          <button className="action-button w-full" onClick={p.onSignOut}>Cerrar sesión</button>
           <button className="text-xs underline text-slate-600" onClick={()=>setViewOpen(false)}>Cerrar opciones</button>
         </div>}
       </div>
