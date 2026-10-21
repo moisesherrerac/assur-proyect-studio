@@ -21,3 +21,55 @@
 .form-control { display:block; width:100%; border:1px solid #d6d3d1; border-radius:6px; padding:7px 9px; margin-top:5px; background:#fff; color:#1e293b; font-size:14px; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline:2px solid #7e22ce; outline-offset:2px; }
 ::selection { background:#e9d5ff; color:#3b0764; }
+
+/* Compact tools fit their actual available height, adding columns when needed. */
+.tool-rail {
+  --rail-cell-height: 34px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: repeat(var(--rail-columns), 104px);
+  grid-template-rows: repeat(var(--rail-rows), var(--rail-cell-height));
+  gap: 2px;
+  width: var(--rail-width);
+  min-height: 0;
+  padding: 6px 4px;
+  overflow: visible;
+}
+.tool-rail > div:not([data-rail-separator]) { display: contents; }
+.tool-rail > [data-rail-separator], .tool-rail > div > span { display: none; }
+.tool-rail > div > div { min-width: 0; width: 100%; height: var(--rail-cell-height); margin: 0; }
+.tool-rail > div > button, .tool-rail > div > div > button {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  height: var(--rail-cell-height);
+  margin: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.tool-rail > div > button > svg, .tool-rail > div > div > button > svg,
+.tool-rail > div > button > div > svg { width: 18px; height: 18px; margin: 0; flex-shrink: 0; }
+.tool-rail > div > button > span, .tool-rail > div > div > button > span {
+  font-size: 11px;
+  line-height: 1.2;
+  text-align: left;
+  white-space: nowrap;
+}
+.tool-rail .tool-rail-popover {
+  position: fixed;
+  left: calc(var(--rail-width) + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  max-width: calc(100vw - var(--rail-width) - 20px);
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+@media (pointer: coarse) { .tool-rail { --rail-cell-height: 44px; } }
+@media (max-width: 600px) {
+  .tool-rail .tool-rail-popover { left: 12px; right: 12px; width: auto; max-width: none; }
+}

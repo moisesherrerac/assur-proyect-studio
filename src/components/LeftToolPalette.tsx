@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { ActiveTool, CameraInsertionPreset } from '../types/cad';
 import { CAMERA_CRITERIA_PRESETS } from '../utils/symbology';
 import {
@@ -48,10 +48,27 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
   const [colorMenuOpen, setColorMenuOpen] = useState(false);
   const [northMenuOpen, setNorthMenuOpen] = useState(false);
 
+  const railRef = useRef<HTMLElement>(null);
+  const toolCount = totalDevicesCount > 0 ? 17 : 16;
+  const [rows, setRows] = useState(toolCount);
+  useLayoutEffect(() => {
+    const rail = railRef.current;
+    if (!rail) return;
+    const fit = () => {
+      const cellHeight = Number.parseFloat(getComputedStyle(rail).getPropertyValue('--rail-cell-height')) || 34;
+      setRows(Math.max(1, Math.min(toolCount, Math.floor((rail.clientHeight - 12 + 2) / (cellHeight + 2)))));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(rail);
+    return () => observer.disconnect();
+  }, [toolCount]);
+  const columns = Math.ceil(toolCount / rows);
+
   const isCameraActive = activeTool.startsWith('camera-');
 
   return (
-    <aside className="w-16 md:w-[72px] bg-white border-r border-stone-200 flex flex-col items-center py-2.5 z-30 select-none shadow-xs shrink-0 overflow-y-auto">
+    <aside ref={railRef} aria-label="Herramientas del plano" className="tool-rail bg-white border-r border-stone-200 z-30 select-none shrink-0" style={{ '--rail-rows': rows, '--rail-columns': columns, '--rail-width': `${columns * 104 + (columns - 1) * 2 + 8}px` } as React.CSSProperties}>
       {/* 1. SELECCIÓN */}
       <div className="flex flex-col items-center w-full px-2 mb-2">
         <button
@@ -69,7 +86,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </button>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 2. ARQUITECTURA & PERÍMETROS */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
@@ -129,7 +146,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
           </button>
 
           {northMenuOpen && (
-            <div className="absolute left-full top-0 ml-2 w-64 bg-white rounded-xl shadow-2xl border border-purple-200 p-3 z-50 flex flex-col gap-2.5">
+            <div className="tool-rail-popover absolute left-full top-0 ml-2 w-64 bg-white rounded-xl shadow-2xl border border-purple-200 p-3 z-50 flex flex-col gap-2.5">
               <div className="flex items-center justify-between font-bold text-slate-900 border-b border-stone-100 pb-1.5">
                 <span className="flex items-center gap-1.5 text-purple-700 text-xs font-bold">
                   <Compass className="w-4 h-4" />
@@ -189,7 +206,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </div>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 3. CÁMARAS CCTV */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2 relative">
@@ -236,7 +253,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
 
           {/* Menú de colores/criterios */}
           {colorMenuOpen && (
-            <div className="absolute left-full top-0 ml-2 w-56 bg-white rounded-xl shadow-xl border border-stone-200 p-2 z-50 flex flex-col gap-1">
+            <div className="tool-rail-popover absolute left-full top-0 ml-2 w-56 bg-white rounded-xl shadow-xl border border-stone-200 p-2 z-50 flex flex-col gap-1">
               <div className="text-[11px] font-bold text-slate-700 px-2 py-1 border-b border-stone-100">
                 Criterio y Color de Cámara
               </div>
@@ -284,7 +301,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
           </button>
 
           {cameraMenuOpen && (
-            <div className="absolute left-full top-0 ml-2 w-48 bg-white rounded-xl shadow-xl border border-stone-200 p-1.5 z-50 flex flex-col gap-1 text-xs">
+            <div className="tool-rail-popover absolute left-full top-0 ml-2 w-48 bg-white rounded-xl shadow-xl border border-stone-200 p-1.5 z-50 flex flex-col gap-1 text-xs">
               <div className="text-[11px] font-bold text-slate-700 px-2 py-1 border-b border-stone-100">
                 Modelos de Cámara
               </div>
@@ -359,7 +376,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </div>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 4. TELECOMUNICACIONES */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
@@ -394,7 +411,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </button>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 5. AUDIO & SEGURIDAD */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
@@ -443,7 +460,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </button>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 6. RED & CERCOS */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
@@ -478,7 +495,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
         </button>
       </div>
 
-      <div className="w-8 h-px bg-stone-200 my-1" />
+      <div data-rail-separator aria-hidden="true" />
 
       {/* 7. HERRAMIENTAS & MEDIDAS */}
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
