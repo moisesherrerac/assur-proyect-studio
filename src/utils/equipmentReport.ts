@@ -31,7 +31,7 @@ export function buildEquipmentRows(project: ReportProject): EquipmentRow[] {
       const type = kind === 'fences' ? `Cerco eléctrico — ${fenceProfile(d.mountingType).label.toLowerCase()}` : types[d.type || d.wireType] || 'Equipo';
       const isRoute = kind === 'fences' || kind === 'wiring';
       const length = isRoute ? d.points.slice(1).reduce((sum: number, p: any, i: number) => sum + Math.hypot(p.x - d.points[i].x, p.y - d.points[i].y), 0) : 0;
-      const details = [type, d.model, kind === 'cameras' ? d.resolution : null,
+      const details = [type, kind === 'fences' ? d.labelText : null, d.model, kind === 'cameras' ? d.resolution : null,
         kind === 'antennas' ? d.frequency : null, kind === 'fences' ? `${d.linesCount} líneas; ${d.energizerVoltage}` : null].filter(Boolean).join(', ');
       rows.push({ id: d.id, kind, code: d.label, type,
         status: statuses[d.status] || (kind === 'wiring' ? 'Sin especificar' : 'Sin especificar'),

@@ -111,6 +111,13 @@ export interface CadStructure {
 export type FenceMountType = 'madera' | 'metal' | 'muro';
 
 export interface ElectricFence {
+  strokeWidth?: number;
+  labelText?: string;
+  labelFontSize?: number;
+  labelOffsetX?: number;
+  labelOffsetY?: number;
+  showLabel?: boolean;
+  showWarningSigns?: boolean;
   mountingType?: FenceMountType;
   glosa?: string;
   id: string;

@@ -151,3 +151,6 @@ Validación del proyecto: `npm run lint`, `npm test` y `npm run build`. GitHub A
 La simbología de la lámina se construye solo con elementos incorporados: no muestra categorías con cantidad cero. Se actualiza al añadir, eliminar o cambiar equipos y trazados.
 
 La barra ofrece tres cercos: **C. madera** (café, trazo discontinuo con círculos), **C. metálico** (azul, trazo de punto y raya con cuadrados) y **C. muro** (violeta, trazo continuo con marcas de ladrillo). Marca los puntos y pulsa Enter para terminar. Selecciona un cerco y cambia **Tipo de soporte** en Propiedades para reclasificarlo. El tipo se conserva en GitHub y en las copias `.cadmap`, y aparece diferenciado en el informe. Los cercos de versiones anteriores conservan sus datos y quedan con soporte sin especificar hasta clasificarlos.
+
+
+Al seleccionar un cerco, **Propiedades** permite cambiar el grosor de línea (1 a 10), el código y un texto adicional de hasta 160 caracteres. La etiqueta admite tamaño ajustable, puede mostrarse u ocultarse y se arrastra con **Puntero** sin mover el cerco. **Restablecer posición del texto** devuelve su ubicación inicial. Los avisos eléctricos también pueden mostrarse u ocultarse. Estos ajustes se conservan en el proyecto y en la lámina exportada.

@@ -39,6 +39,12 @@ export function validateProject(value: unknown): any {
         structures: ['building','perimeter','wall','road']
       };
       if (allowed[key] && !allowed[key].includes(item.type)) fail();
+      if (key === 'fences') {
+        if (item.strokeWidth !== undefined && (!finite(item.strokeWidth) || item.strokeWidth < 1 || item.strokeWidth > 10)) fail();
+        if (item.labelFontSize !== undefined && (!finite(item.labelFontSize) || item.labelFontSize < 10 || item.labelFontSize > 24)) fail();
+        if (item.labelText !== undefined && (typeof item.labelText !== 'string' || item.labelText.length > 160)) fail();
+        for (const flag of ['showLabel','showWarningSigns']) if (item[flag] !== undefined && typeof item[flag] !== 'boolean') fail();
+      }
       if (key === 'fences' && item.mountingType !== undefined && !['madera','metal','muro'].includes(item.mountingType)) fail();
       if (key === 'wiring' && !['conduit-emt','conduit-pvc','utp-cat6','fibra-optica','energia-ac'].includes(item.wireType)) fail();
       if (item.status !== undefined && !['nueva','existente','reubicar','baja'].includes(item.status)) fail();

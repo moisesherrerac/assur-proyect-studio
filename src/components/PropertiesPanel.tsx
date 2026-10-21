@@ -92,6 +92,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   const currentAnt = antennas.find(a => a.id === selectedId);
   const currentAud = audioAlarms.find(a => a.id === selectedId);
   const currentFence = fences.find(f => f.id === selectedId);
+  const updateFence = (updates: Partial<ElectricFence>) => setFences(prev=>prev.map(f=>f.id===selectedId?{...f,...updates}:f));
   const currentWire = wiring.find(w => w.id === selectedId);
   const currentAnn = annotations.find(a => a.id === selectedId);
 
@@ -742,29 +743,38 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
 
         {/* Fence Properties */}
         {currentFence && (
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-3">Tipo de soporte
+          <div className="space-y-4">
+            <label className="block text-xs font-semibold text-slate-700">Tipo de soporte
               <select className="form-control" value={currentFence.mountingType || ''} onChange={e=>{
                 const profile=FENCE_PROFILES.find(p=>p.type===e.target.value);
-                if(profile)setFences(prev=>prev.map(f=>f.id===selectedId?{...f,mountingType:profile.type,color:profile.color}:f));
+                if(profile)updateFence({mountingType:profile.type,color:profile.color});
               }}>
                 {!currentFence.mountingType&&<option value="">Sin especificar (plano anterior)</option>}
                 {FENCE_PROFILES.map(p=><option key={p.type} value={p.type}>{p.label}</option>)}
               </select>
             </label>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Zona de Cerco Eléctrico
+            <label className="block text-xs font-semibold text-slate-700">Código del cerco
+              <input type="text" className="form-control" maxLength={40} value={currentFence.label} onChange={e=>updateFence({label:e.target.value})}/>
             </label>
-            <input
-              type="text"
-              value={currentFence.label}
-              onChange={e =>
-                setFences(prev =>
-                  prev.map(f => (f.id === selectedId ? { ...f, label: e.target.value } : f))
-                )
-              }
-              className="w-full bg-stone-50 border border-stone-300 rounded-lg px-2.5 py-1.5 text-xs text-slate-900 font-mono"
-            />
+            <label className="block text-xs font-semibold text-slate-700">Grosor de línea · {currentFence.strokeWidth??2.5}
+              <input type="range" className="block w-full mt-3 accent-sky-600" min="1" max="10" step="0.5" value={currentFence.strokeWidth??2.5} onChange={e=>updateFence({strokeWidth:Number(e.target.value)})}/>
+            </label>
+            <div className="pt-3 border-t border-stone-200 space-y-3">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input type="checkbox" checked={currentFence.showLabel!==false} onChange={e=>updateFence({showLabel:e.target.checked})}/>Mostrar etiqueta
+              </label>
+              <label className="block text-xs font-semibold text-slate-700">Texto de la etiqueta
+                <textarea className="form-control resize-y" rows={2} maxLength={160} value={currentFence.labelText||''} placeholder="Acceso norte · tramo proyectado" onChange={e=>updateFence({labelText:e.target.value})}/>
+              </label>
+              <label className="block text-xs font-semibold text-slate-700">Tamaño del texto · {currentFence.labelFontSize??11}
+                <input type="range" className="block w-full mt-3 accent-sky-600" min="10" max="24" step="1" value={currentFence.labelFontSize??11} disabled={currentFence.showLabel===false} onChange={e=>updateFence({labelFontSize:Number(e.target.value)})}/>
+              </label>
+              <p className="text-xs text-slate-500">Arrastra la etiqueta con Puntero para ubicarla.</p>
+              <button type="button" className="action-button w-full" onClick={()=>updateFence({labelOffsetX:40,labelOffsetY:-36})}>Restablecer posición del texto</button>
+            </div>
+            <label className="flex items-center gap-2 text-xs text-slate-700 pt-3 border-t border-stone-200">
+              <input type="checkbox" checked={currentFence.showWarningSigns!==false} onChange={e=>updateFence({showWarningSigns:e.target.checked})}/>Mostrar avisos eléctricos
+            </label>
           </div>
         )}
 

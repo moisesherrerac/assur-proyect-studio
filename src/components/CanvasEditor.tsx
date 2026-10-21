@@ -18,7 +18,7 @@ import {
 } from '../types/cad';
 import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
-import { drawFencePath, fenceProfile, fenceTypeForTool, isElectricFenceTool } from '../utils/fences';
+import { drawFenceLabel, fenceLabelLayout, fenceLabelAnchor, drawFencePath, fenceProfile, fenceTypeForTool, isElectricFenceTool } from '../utils/fences';
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
   Check,
@@ -819,7 +819,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           if (fence.points.length < 2) return;
           const isSelected = selectedId === fence.id && !isExportMode;
 
-          drawFencePath(ctx, fence.points, fence, isSelected ? 4 : 2.5);
+          drawFencePath(ctx, fence.points, fence, (fence.strokeWidth ?? 2.5) + (isSelected ? 1.5 : 0));
+          if (layers.labels) drawFenceLabel(ctx, fence, isSelected);
 
           fence.points.forEach((pt, idx) => {
             if (isSelected) {
@@ -832,7 +833,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             ctx.stroke();
             }
 
-            if (idx < fence.points.length - 1 && layers.labels) {
+            if (idx < fence.points.length - 1 && layers.labels && fence.showWarningSigns !== false) {
               const nextPt = fence.points[idx + 1];
               const segLen = Math.hypot(nextPt.x - pt.x, nextPt.y - pt.y);
               if (segLen > 140) {
@@ -1846,6 +1847,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       }
     }
 
+    if (layers.electricFences && !locks.electricFences && layers.labels) {
+      const labelCtx=canvasRef.current?.getContext('2d');
+      if(labelCtx)for(const fence of fences) {
+        const box=fenceLabelLayout(labelCtx,fence);
+        if(box&&Math.abs(worldPt.x-box.x)<=box.width/2+4&&Math.abs(worldPt.y-box.y)<=box.height/2+4)
+          return {type:'fence-label',id:fence.id,lx:box.x,ly:box.y};
+      }
+    }
     if (layers.electricFences && !locks.electricFences) {
       for (const fence of fences) {
         for (let i = 0; i < fence.points.length - 1; i++) {
@@ -2198,7 +2207,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         const found = findItemAt(rawWorldPt);
         if (found) {
           setSelectedId(found.id);
-          if (found.type === 'camera-label' || found.type === 'audio-label') {
+          if (found.type === 'camera-label' || found.type === 'audio-label' || found.type === 'fence-label') {
             onInteractionStart?.();
             setIsDraggingLabel(true);
             setDragOffset({ x: rawWorldPt.x - (found.lx || 0), y: rawWorldPt.y - (found.ly || 0) });
@@ -2341,6 +2350,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     if (isDraggingLabel && selectedId) {
       const targetLX = rawWorldPt.x - dragOffset.x;
       const targetLY = rawWorldPt.y - dragOffset.y;
+      setFences(prev=>prev.map(f=> {
+        if(f.id!==selectedId)return f;
+        const anchor=fenceLabelAnchor(f.points);if(!anchor)return f;
+        return {...f,labelOffsetX:Math.round(targetLX-anchor.x),labelOffsetY:Math.round(targetLY-anchor.y)};
+      }));
       setCameras(prev =>
         prev.map(c =>
           c.id === selectedId

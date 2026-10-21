@@ -94,3 +94,21 @@ test('older fences are preserved without assigning an invented support',()=>{
   assert.equal(legacy.mountingType,undefined);assert.equal(fenceProfile(legacy.mountingType).label,'Soporte sin especificar');
   assert.throws(()=>validateProject({...example,fences:[{...legacy,mountingType:'otro'}]}));
 });
+
+
+import {fenceLabelAnchor} from '../src/utils/fences';
+test('fence line and label settings survive editable project serialization',()=>{
+  const fence={...example.fences[0],strokeWidth:7.5,labelText:'Acceso norte — tramo nuevo',labelFontSize:18,labelOffsetX:95,labelOffsetY:-70,showLabel:true,showWarningSigns:false};
+  const restored=validateProject(JSON.parse(JSON.stringify({...example,fences:[fence]}))).fences[0];
+  assert.deepEqual(restored,fence);
+  assert.equal(validateProject(example).fences[0].strokeWidth,undefined);
+});
+test('fence label anchors follow half the route length, including degenerate routes',()=>{
+  assert.deepEqual(fenceLabelAnchor([{x:0,y:0},{x:100,y:0},{x:100,y:300}]),{x:100,y:100});
+  assert.deepEqual(fenceLabelAnchor([{x:3,y:5},{x:3,y:5}]),{x:3,y:5});
+  assert.equal(fenceLabelAnchor([]),null);
+});
+test('invalid fence line and label settings are rejected before loading',()=>{
+  for(const patch of [{strokeWidth:0},{strokeWidth:11},{labelFontSize:30},{labelText:'x'.repeat(161)},{showLabel:'true'},{showWarningSigns:1}])
+    assert.throws(()=>validateProject({...example,fences:[{...example.fences[0],...patch}]}));
+});
