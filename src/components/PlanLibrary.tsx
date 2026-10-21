@@ -31,7 +31,7 @@ export function PlanLibrary({ library, current, getDocument, onSaved, onOpen, on
   };
   const visible = plans.filter(p => p.archived === archived && (!folderFilter || p.folder === folderFilter) && `${p.name} ${p.client} ${p.folder}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const folders = [...new Set(plans.filter(p => p.archived === archived).map(p => p.folder))].sort((a,b)=>a.localeCompare(b,'es'));
-  return <Dialog title="Mis planos" onClose={onClose} wide>
+  return <Dialog title="Mis planos" onClose={() => { if (!busy) onClose(); }} wide>
     <p className="text-sm text-slate-600 mb-5">Biblioteca privada en GitHub. Los cambios se sincronizan al pulsar Guardar; la copia de trabajo del navegador es temporal.</p>
     <form className="flex flex-wrap gap-3 items-end pb-5 border-b border-stone-200" onSubmit={e=>{e.preventDefault();void save(false);}}>
       <label className="text-sm font-medium flex-1 min-w-52">Nombre del plano<input className="form-control" value={name} maxLength={160} required onChange={e=>setName(e.target.value)} disabled={busy}/></label>
@@ -66,7 +66,7 @@ export function PlanLibrary({ library, current, getDocument, onSaved, onOpen, on
     </div>
     <div className="mt-5 pt-4 border-t border-stone-200 text-xs text-slate-600 flex flex-wrap gap-4">
       <span>Archivar conserva los archivos y su historial. Tamaño máximo por plano: 20 MB.</span>
-      <button className="text-purple-800 underline" onClick={()=>{onRecoverLegacy();onClose();}}>Recuperar respaldo local de la versión anterior</button>
+      <button className="text-purple-800 underline disabled:opacity-50" disabled={busy} onClick={()=>{onRecoverLegacy();onClose();}}>Recuperar respaldo local de la versión anterior</button>
     </div>
   </Dialog>;
 }
