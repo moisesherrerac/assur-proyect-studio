@@ -62,7 +62,9 @@ export class GitHubPlanLibrary implements PlanLibrary {
     if (!this.#token) throw new PlanAccessError();
     let response: Response;
     try {
-      response = await this.#fetch(`https://api.github.com/repos/${PLAN_REPOSITORY}${path}`, {
+      // Native browser fetch must not receive this library instance as its receiver.
+      const request = this.#fetch;
+      response = await request(`https://api.github.com/repos/${PLAN_REPOSITORY}${path}`, {
         ...options, signal: AbortSignal.timeout(30000), cache: 'no-store', credentials: 'omit', redirect: 'error', referrerPolicy: 'no-referrer',
         headers: { Accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
           'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2026-03-10', Authorization: `Bearer ${this.#token}` }

@@ -79,3 +79,14 @@ test('a simultaneous branch update becomes a recoverable conflict',async()=>{
   await assert.rejects(()=>new GitHubPlanLibrary('test',request).save(example,'Plano','General'),PlanConflictError);
   assert.equal(mock.index.plans.length,0);
 });
+
+test('browser fetch is invoked without a library instance as its receiver',async()=>{
+  let called=false;
+  const browserFetch:typeof fetch=async function(this:unknown){
+    assert.equal(this,undefined,'Native browser fetch rejects a custom instance receiver');
+    called=true;
+    return new Response(JSON.stringify({private:true,full_name:PLAN_REPOSITORY,default_branch:'main',permissions:{push:true}}));
+  };
+  await new GitHubPlanLibrary('test',browserFetch).connect();
+  assert.equal(called,true);
+});
