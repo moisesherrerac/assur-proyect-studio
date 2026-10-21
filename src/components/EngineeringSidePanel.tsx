@@ -47,6 +47,7 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
   antennas,
   audioAlarms,
   fences,
+  wiring,
   structuresCount,
   cameraPreset,
   metadata,
@@ -67,7 +68,7 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
     antennas,
     fences,
     structuresCount,
-    cameraPreset
+    cameraPreset, wiring
   );
 
   const handleSaveNotes = () => {
@@ -165,7 +166,7 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
                   : 'border-transparent text-slate-500 hover:text-slate-800'
               }`}
             >
-              Simbología ({cameras.length})
+              Simbología ({dynamicSymRows.length})
             </button>
             <button
               onClick={() => setActiveTab('notas')}

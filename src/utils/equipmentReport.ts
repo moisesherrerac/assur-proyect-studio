@@ -1,4 +1,5 @@
 import type { CameraDevice, NetworkAntenna, AudioAlarmDevice, ElectricFence, WiringRoute, ProjectMetadata } from '../types/cad';
+import { fenceProfile } from './fences';
 import { safeFilename, downloadText } from './project';
 
 export type EquipmentKind = 'cameras' | 'antennas' | 'audioAlarms' | 'fences' | 'wiring';
@@ -27,7 +28,7 @@ export function buildEquipmentRows(project: ReportProject): EquipmentRow[] {
   for (const kind of ['cameras', 'antennas', 'audioAlarms', 'fences', 'wiring'] as EquipmentKind[]) {
     for (const item of project[kind]) {
       const d = item as any;
-      const type = kind === 'fences' ? 'Cerco eléctrico' : types[d.type || d.wireType] || 'Equipo';
+      const type = kind === 'fences' ? `Cerco eléctrico — ${fenceProfile(d.mountingType).label.toLowerCase()}` : types[d.type || d.wireType] || 'Equipo';
       const isRoute = kind === 'fences' || kind === 'wiring';
       const length = isRoute ? d.points.slice(1).reduce((sum: number, p: any, i: number) => sum + Math.hypot(p.x - d.points[i].x, p.y - d.points[i].y), 0) : 0;
       const details = [type, d.model, kind === 'cameras' ? d.resolution : null,

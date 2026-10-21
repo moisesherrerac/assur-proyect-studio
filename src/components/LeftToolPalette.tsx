@@ -1,5 +1,6 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import { ActiveTool, CameraInsertionPreset } from '../types/cad';
+import { FENCE_PROFILES } from '../utils/fences';
 import { CAMERA_CRITERIA_PRESETS } from '../utils/symbology';
 import {
   MousePointer,
@@ -49,7 +50,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
   const [northMenuOpen, setNorthMenuOpen] = useState(false);
 
   const railRef = useRef<HTMLElement>(null);
-  const toolCount = totalDevicesCount > 0 ? 17 : 16;
+  const toolCount = totalDevicesCount > 0 ? 19 : 18;
   const [rows, setRows] = useState(toolCount);
   useLayoutEffect(() => {
     const rail = railRef.current;
@@ -466,19 +467,13 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
       <div className="flex flex-col items-center w-full px-2 gap-1 mb-2">
         <span className="text-[9px] font-mono font-bold tracking-wider text-slate-400 uppercase">RED</span>
 
-        <button
-          type="button"
-          onClick={() => setActiveTool('electric-fence')}
-          title="Cerco Eléctrico Perimetral de Alta Tensión (Enter para finalizar)"
-          className={`w-full flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all cursor-pointer ${
-            activeTool === 'electric-fence'
-              ? 'bg-purple-50 text-purple-700 border border-purple-300 font-bold shadow-xs'
-              : 'text-slate-600 hover:text-slate-900 hover:bg-stone-100'
-          }`}
-        >
-          <Zap className="w-5 h-5 mb-1 text-amber-500" />
-          <span className="text-[10px] tracking-tight text-center leading-tight">Cerco</span>
-        </button>
+        {FENCE_PROFILES.map(profile => <button key={profile.type} type="button"
+          onClick={() => setActiveTool(`electric-fence-${profile.type}`)}
+          title={`Cerco eléctrico ${profile.label.toLowerCase()}: traza los puntos y pulsa Enter`}
+          className={`w-full flex items-center gap-1 rounded-lg ${activeTool === `electric-fence-${profile.type}` ? 'bg-purple-50 border border-purple-300 font-bold' : 'hover:bg-stone-100'}`}>
+          <Zap className="w-5 h-5" style={{color:profile.color}}/>
+          <span>{profile.type==='madera'?'C. madera':profile.type==='metal'?'C. metálico':'C. muro'}</span>
+        </button>)}
 
         <button
           type="button"

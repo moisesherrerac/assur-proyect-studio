@@ -108,7 +108,10 @@ export interface CadStructure {
   showDimensions?: boolean; // show length in meters along segments
 }
 
+export type FenceMountType = 'madera' | 'metal' | 'muro';
+
 export interface ElectricFence {
+  mountingType?: FenceMountType;
   glosa?: string;
   id: string;
   points: FencePoint[];
@@ -210,6 +213,9 @@ export type ActiveTool =
   | 'speaker-horn'
   | 'siren-strobe'
   | 'electric-fence'
+  | 'electric-fence-madera'
+  | 'electric-fence-metal'
+  | 'electric-fence-muro'
   | 'wiring-conduit'
   | 'rack-cabinet'
   | 'text-annotation'

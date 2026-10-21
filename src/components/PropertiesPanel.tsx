@@ -14,6 +14,7 @@ import {
   CadHatchPattern,
   CameraInsertionPreset
 } from '../types/cad';
+import { FENCE_PROFILES } from '../utils/fences';
 import { CAMERA_CRITERIA_PRESETS, getCameraDefaultCriterion } from '../utils/symbology';
 import {
   Video,
@@ -742,6 +743,15 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
         {/* Fence Properties */}
         {currentFence && (
           <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-3">Tipo de soporte
+              <select className="form-control" value={currentFence.mountingType || ''} onChange={e=>{
+                const profile=FENCE_PROFILES.find(p=>p.type===e.target.value);
+                if(profile)setFences(prev=>prev.map(f=>f.id===selectedId?{...f,mountingType:profile.type,color:profile.color}:f));
+              }}>
+                {!currentFence.mountingType&&<option value="">Sin especificar (plano anterior)</option>}
+                {FENCE_PROFILES.map(p=><option key={p.type} value={p.type}>{p.label}</option>)}
+              </select>
+            </label>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
               Zona de Cerco Eléctrico
             </label>

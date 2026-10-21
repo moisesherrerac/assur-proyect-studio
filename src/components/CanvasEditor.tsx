@@ -18,6 +18,7 @@ import {
 } from '../types/cad';
 import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
+import { drawFencePath, fenceProfile, fenceTypeForTool, isElectricFenceTool } from '../utils/fences';
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
   Check,
@@ -818,25 +819,18 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           if (fence.points.length < 2) return;
           const isSelected = selectedId === fence.id && !isExportMode;
 
-          ctx.beginPath();
-          ctx.moveTo(fence.points[0].x, fence.points[0].y);
-          for (let i = 1; i < fence.points.length; i++) {
-            ctx.lineTo(fence.points[i].x, fence.points[i].y);
-          }
-          ctx.strokeStyle = fence.color || '#d97706';
-          ctx.lineWidth = isSelected ? 4 : 2.5;
-          ctx.setLineDash([10, 5]);
-          ctx.stroke();
-          ctx.setLineDash([]);
+          drawFencePath(ctx, fence.points, fence, isSelected ? 4 : 2.5);
 
           fence.points.forEach((pt, idx) => {
-            ctx.fillStyle = isSelected ? '#0284c7' : '#ffffff';
+            if (isSelected) {
+            ctx.fillStyle = '#0284c7';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, isSelected ? 6 : 4.5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
+            }
 
             if (idx < fence.points.length - 1 && layers.labels) {
               const nextPt = fence.points[idx + 1];
@@ -853,7 +847,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 ctx.font = 'bold 9px monospace';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText('⚡12kV', midX, midY);
+                ctx.fillText('ELEC.', midX, midY);
               }
             }
           });
@@ -910,8 +904,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         }
 
         ctx.strokeStyle =
-          activeTool === 'electric-fence'
-            ? '#d97706'
+          isElectricFenceTool(activeTool)
+            ? fenceProfile(fenceTypeForTool(activeTool)).color
             : activeTool === 'wiring-conduit'
             ? '#059669'
             : '#0284c7';
@@ -1048,7 +1042,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           if (dev.type === 'speaker-horn') {
             drawSpeakerHornSymbol(ctx, dev.color || '#eab308', 1.15, true);
           } else if (dev.type === 'siren-strobe') {
-            ctx.fillStyle = '#dc2626';
+            ctx.fillStyle = dev.color || '#dc2626';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 1.5;
             ctx.beginPath();
@@ -1061,7 +1055,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
             ctx.textBaseline = 'middle';
             ctx.fillText('!', 0, 0);
           } else {
-            ctx.fillStyle = '#1e293b';
+            ctx.fillStyle = dev.color || '#1e293b';
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 1.5;
             ctx.fillRect(-12, -12, 24, 24);
@@ -1493,12 +1487,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         antennas,
         fences,
         structures.length,
-        cameraPreset
+        cameraPreset, wiring
       );
 
       // Adapt row height if many distinct camera colors/criteria are added
-      const maxSymRows = Math.min(dynamicRows.length, 7);
-      const rowHeight = maxSymRows >= 6 ? 44 : 51;
+      const maxSymRows = dynamicRows.length;
+      const legendSpace = Math.max(100, sideBottom - 370 - curY - 160);
+      const rowHeight = Math.max(24, Math.min(51, Math.floor(legendSpace / Math.max(1,maxSymRows))));
 
       const drawSymRow = (
         drawIconFn: (cx: number, cy: number) => void,
@@ -1511,10 +1506,10 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
         ctx.save();
         ctx.fillStyle = inkColor;
-        drawFittedText(ctx, title, sideX + 72, yPos + 5, sideW - 132, rowHeight - 21,
-          { size: 12.5, minSize: 10.5, maxLines: 2 });
+        drawFittedText(ctx, title, sideX + 72, yPos + 5, sideW - 132, rowHeight < 34 ? rowHeight - 10 : rowHeight - 21,
+          { size: rowHeight < 34 ? 10.5 : 12.5, minSize: 8, maxLines: rowHeight < 34 ? 1 : 2 });
         ctx.fillStyle = subInkColor;
-        drawFittedText(ctx, subtitle, sideX + 72, yPos + rowHeight - 16, sideW - 132, 13,
+        if (rowHeight >= 34) drawFittedText(ctx, subtitle, sideX + 72, yPos + rowHeight - 16, sideW - 132, 13,
           { size: 10, minSize: 9, weight: '600', maxLines: 1 });
         ctx.fillStyle = inkColor;
         drawFittedText(ctx, countStr, sideX + sideW - 48, yPos + 5, 32, rowHeight - 10,
@@ -1552,14 +1547,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
               ctx.fill();
               ctx.stroke();
             } else if (row.symbolKind === 'fence') {
-              ctx.strokeStyle = row.color;
-              ctx.lineWidth = 2.5;
-              ctx.setLineDash([6, 3]);
-              ctx.beginPath();
-              ctx.moveTo(-16, 0);
-              ctx.lineTo(16, 0);
-              ctx.stroke();
-              ctx.setLineDash([]);
+              drawFencePath(ctx,[{x:-20,y:0},{x:20,y:0}],{mountingType:row.fenceMountingType,color:row.color});
+            } else if (row.symbolKind === 'wiring') {
+              ctx.strokeStyle=row.color;ctx.lineWidth=2.5;ctx.setLineDash([6,3]);ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(18,0);ctx.stroke();ctx.setLineDash([]);
+            } else if (row.symbolKind === 'siren') {
+              ctx.fillStyle=row.color;ctx.strokeStyle=inkColor;ctx.beginPath();ctx.arc(0,0,9,0,Math.PI*2);ctx.fill();ctx.stroke();
+              ctx.fillStyle='#fff';ctx.font='bold 12px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('!',0,0);
+            } else if (row.symbolKind === 'rack') {
+              ctx.fillStyle=row.color;ctx.fillRect(-11,-10,22,20);ctx.strokeStyle='#fff';ctx.lineWidth=1.5;
+              for(const y of [-5,0,5]){ctx.beginPath();ctx.moveTo(-7,y);ctx.lineTo(7,y);ctx.stroke();}
             } else {
               ctx.fillStyle = 'rgba(226, 232, 240, 0.7)';
               ctx.strokeStyle = inkColor;
@@ -1579,11 +1575,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         curY += rowHeight;
       });
 
+      if (!dynamicRows.length) {
+        ctx.fillStyle=subInkColor;ctx.font='11px sans-serif';ctx.textAlign='left';ctx.fillText('SIN ELEMENTOS INCORPORADOS',sideX+14,curY+20);curY+=32;
+      }
       curY += 12;
 
       // Dynamic Summary Legend Footer Codes
-      const speakerCount = audioAlarms.filter(a => a.type === 'speaker-horn').length;
-      const totalCams = cameras.length;
 
       ctx.textAlign = 'left';
       ctx.fillStyle = inkColor;
@@ -1595,7 +1592,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       const totY = curY + Math.max(1, codeSummaryLines.slice(0, 3).length) * 16 + 4;
       ctx.font = 'bold 12px "Chakra Petch", monospace';
       ctx.fillText(
-        `TOTAL: ${totalCams} CÁMARAS · ${speakerCount} BOCINAS`,
+        dynamicRows.length ? `TOTAL: ${dynamicRows.reduce((sum,row)=>sum+row.count,0)} ELEMENTOS` : '',
         sideX + 14,
         totY
       );
@@ -1933,16 +1930,19 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       };
       setStructures(prev => [...prev, newStruct]);
       setSelectedId(newStruct.id);
-    } else if (activeTool === 'electric-fence') {
+    } else if (isElectricFenceTool(activeTool)) {
       const nextNum = fences.length + 1;
+      const mountingType = fenceTypeForTool(activeTool);
+      const profile = fenceProfile(mountingType);
       const newFence: ElectricFence = {
+        mountingType,
         id: `fence-${Date.now()}`,
         points: [...currentPoints],
         label: nextLabel('CERCO', fences),
         status: 'nueva',
-        color: '#d97706',
+        color: profile.color,
         linesCount: 6,
-        energizerVoltage: '12,000 V / 1.5J',
+        energizerVoltage: 'Por definir',
         warningSignsInterval: 50
       };
       setFences(prev => [...prev, newFence]);
@@ -1990,7 +1990,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       }
 
       if (
-        activeTool === 'electric-fence' ||
+        isElectricFenceTool(activeTool) ||
         activeTool === 'wiring-conduit' ||
         activeTool === 'draw-building' ||
         activeTool === 'draw-perimeter'
@@ -2609,8 +2609,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 ? 'Estructura / Nave'
                 : activeTool === 'draw-perimeter'
                 ? 'Perímetro Predial'
-                : activeTool === 'electric-fence'
-                ? 'Cerco Eléctrico'
+                : isElectricFenceTool(activeTool)
+                ? `Cerco ${fenceProfile(fenceTypeForTool(activeTool)).label.toLowerCase()}`
                 : 'Ruta'}
               : {currentPoints.length} vértices
             </span>

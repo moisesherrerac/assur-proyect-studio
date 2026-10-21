@@ -39,6 +39,7 @@ export function validateProject(value: unknown): any {
         structures: ['building','perimeter','wall','road']
       };
       if (allowed[key] && !allowed[key].includes(item.type)) fail();
+      if (key === 'fences' && item.mountingType !== undefined && !['madera','metal','muro'].includes(item.mountingType)) fail();
       if (key === 'wiring' && !['conduit-emt','conduit-pvc','utp-cat6','fibra-optica','energia-ac'].includes(item.wireType)) fail();
       if (item.status !== undefined && !['nueva','existente','reubicar','baja'].includes(item.status)) fail();
       for (const k of ['rotation', 'range', 'fovAngle', 'beamWidth', 'strokeWidth', 'fillOpacity', 'fontSize', 'labelOffsetX', 'labelOffsetY']) {

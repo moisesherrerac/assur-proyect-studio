@@ -144,3 +144,10 @@ Este proyecto está bajo la licencia **MIT** - eres libre de usarlo, modificarlo
 - **Resumen técnico:** cálculo local con supuestos editables de tasa de bits, retención, horas y consumo PoE; no verifica cobertura ni sustituye las fichas de los equipos.
 
 Validación del proyecto: `npm run lint`, `npm test` y `npm run build`. GitHub Actions ejecuta las tres comprobaciones antes de publicar.
+
+
+## Simbología y cercos
+
+La simbología de la lámina se construye solo con elementos incorporados: no muestra categorías con cantidad cero. Se actualiza al añadir, eliminar o cambiar equipos y trazados.
+
+La barra ofrece tres cercos: **C. madera** (café, trazo discontinuo con círculos), **C. metálico** (azul, trazo de punto y raya con cuadrados) y **C. muro** (violeta, trazo continuo con marcas de ladrillo). Marca los puntos y pulsa Enter para terminar. Selecciona un cerco y cambia **Tipo de soporte** en Propiedades para reclasificarlo. El tipo se conserva en GitHub y en las copias `.cadmap`, y aparece diferenciado en el informe. Los cercos de versiones anteriores conservan sus datos y quedan con soporte sin especificar hasta clasificarlos.

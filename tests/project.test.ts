@@ -57,3 +57,40 @@ test('long glosas paginate without throwing or losing equipment', async () => {
   assert.ok(doc.getNumberOfPages()>5);
   const content=doc.output(); assert.match(content,/CN-45/);
 });
+
+
+import { buildDynamicSymbology } from '../src/utils/symbology';
+import { FENCE_PROFILES, fenceProfile, fenceTypeForTool, isElectricFenceTool } from '../src/utils/fences';
+test('an empty plan has no placeholder symbols or zero-count legend rows',()=>{
+  const result=buildDynamicSymbology([],[],[],[],0,{color:'#0284c7',prefix:'CN',categoryLabel:'NUEVA',status:'nueva'});
+  assert.deepEqual(result,{rows:[],codeSummaryLines:[]});
+});
+test('legend follows added and removed equipment including sirens, racks and routes',()=>{
+  const rowFor=(c:any[]=[],a:any[]=[],w:any[]=[])=>buildDynamicSymbology(c,a,[],[],0,undefined,w).rows;
+  assert.equal(rowFor([example.cameras[0]]).length,1);
+  assert.equal(rowFor()[0],undefined);
+  const rows=rowFor([], [...example.audioAlarms,{...example.audioAlarms[0],id:'sir',type:'siren-strobe'}], example.wiring);
+  assert.ok(rows.some(r=>r.symbolKind==='siren'));
+  assert.ok(rows.some(r=>r.symbolKind==='rack'));
+  assert.ok(rows.some(r=>r.symbolKind==='wiring'));
+  assert.ok(rows.every(r=>r.count>0));assert.ok(!rows.some(r=>r.symbolKind==='bullet'));
+});
+test('three fence supports retain distinct colors, patterns and symbols in saved projects and reports',()=>{
+  assert.equal(new Set(FENCE_PROFILES.map(p=>p.color)).size,3);
+  assert.equal(new Set(FENCE_PROFILES.map(p=>p.marker)).size,3);
+  assert.equal(new Set(FENCE_PROFILES.map(p=>JSON.stringify(p.dash))).size,3);
+  const fences=FENCE_PROFILES.map(p=>({...example.fences[0],id:`f-${p.type}`,mountingType:p.type,color:p.color}));
+  const project=validateProject(JSON.parse(JSON.stringify({...example,fences})));
+  assert.deepEqual(project.fences.map((f:any)=>f.mountingType),['madera','metal','muro']);
+  const rows=buildDynamicSymbology([],[],[],project.fences,0).rows;
+  assert.equal(rows.length,3);assert.ok(rows.every(r=>r.count===1));
+  assert.deepEqual(rows.map(r=>r.fenceMountingType),['madera','metal','muro']);
+  const report=buildEquipmentRows({...example,fences}).filter(r=>r.kind==='fences');
+  assert.equal(new Set(report.map(r=>r.type)).size,3);
+  for(const p of FENCE_PROFILES){assert.ok(isElectricFenceTool(`electric-fence-${p.type}`));assert.equal(fenceTypeForTool(`electric-fence-${p.type}`),p.type);}
+});
+test('older fences are preserved without assigning an invented support',()=>{
+  const legacy=validateProject(JSON.parse(JSON.stringify(example))).fences[0];
+  assert.equal(legacy.mountingType,undefined);assert.equal(fenceProfile(legacy.mountingType).label,'Soporte sin especificar');
+  assert.throws(()=>validateProject({...example,fences:[{...legacy,mountingType:'otro'}]}));
+});
