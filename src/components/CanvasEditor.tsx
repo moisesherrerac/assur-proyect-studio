@@ -16,6 +16,7 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from '../types/cad';
+import { fitNotes, getNoteRuns } from '../utils/notes';
 import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
 import { GRID_STEPS, placePlanPoint, visibleGridStep } from '../utils/placement';
@@ -1600,36 +1601,29 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       curY += 44;
 
       ctx.fillStyle = inkColor;
-      ctx.font = '600 11.5px "Chakra Petch", sans-serif';
       ctx.textAlign = 'left';
-
-      const wrapText = (text: string, maxWidth: number): string[] => {
-        const words = text.split(' ');
-        const lines: string[] = [];
-        let current = '';
-        words.forEach(w => {
-          const test = current ? `${current} ${w}` : w;
-          if (ctx.measureText(test).width > maxWidth) {
-            if (current) lines.push(current);
-            current = w;
-          } else {
-            current = test;
-          }
-        });
-        if (current) lines.push(current);
-        return lines;
-      };
-
-      metadata.projectNotes.slice(0, 5).forEach(note => {
-        const lines = wrapText(note.toUpperCase(), sideW - 28);
-        lines.forEach(line => {
-          if (curY + 16.5 < sideBottom - 370 - (sigImageRef.current ? 70 : 16)) {
-            ctx.fillText(line, sideX + 14, curY);
-            curY += 16.5;
-          }
-        });
-        curY += 4;
+      const noteBottom = sideBottom - 370 - (sigImageRef.current ? 70 : 16);
+      const noteFont = (run: { bold?: boolean; italic?: boolean }, size: number) => `${run.italic ? 'italic ' : ''}${run.bold ? 700 : 400} ${size}px "Chakra Petch", Arial, sans-serif`;
+      const fittedNotes = fitNotes(getNoteRuns(metadata), sideW - 28, noteBottom - curY, (text, run, size) => {
+        ctx.font = noteFont(run, size);
+        return ctx.measureText(text).width;
       });
+      for (const line of fittedNotes.lines) {
+        let x = sideX + 14;
+        ctx.textBaseline = 'alphabetic';
+        for (const run of line.runs) {
+          ctx.font = noteFont(run, fittedNotes.size);
+          ctx.fillText(run.text, x, curY);
+          const width = ctx.measureText(run.text).width;
+          if (run.underline) { ctx.beginPath(); ctx.lineWidth = 0.8; ctx.strokeStyle = inkColor; ctx.moveTo(x, curY + 2); ctx.lineTo(x + width, curY + 2); ctx.stroke(); }
+          x += width;
+        }
+        curY += fittedNotes.lineHeight;
+      }
+      if (fittedNotes.remainder.length) {
+        ctx.font = '700 12px "Chakra Petch", Arial, sans-serif';
+        ctx.fillText('CONTINÚA EN ANEXO DE NOTAS', sideX + 14, Math.max(curY + 10, noteBottom - 8));
+      }
 
       // 14D. BOTTOM COMPANY BANNER & FORMAL TITLE BLOCK TABLE
       const tableBottom = sideBottom;
@@ -1685,6 +1679,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       if (sigImageRef.current) {
         ctx.drawImage(sigImageRef.current, sideX + sideW - 115, bannerY - 52, 100, 46);
       }
+      return fittedNotes.remainder;
     },
     [
       theme,
@@ -2466,7 +2461,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         offscreen.height = SHEET_H;
         const offCtx = offscreen.getContext('2d');
         if (offCtx) {
-          renderCadSheet(offCtx, true);
+          (offscreen as HTMLCanvasElement & { notesContinuation?: ReturnType<typeof getNoteRuns> }).notesContinuation = renderCadSheet(offCtx, true);
         }
         return offscreen;
       };

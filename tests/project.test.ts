@@ -3,6 +3,44 @@ import assert from 'node:assert/strict';
 import { nextLabel, distanceLabel, validateProject, cleanSampleIdentity } from '../src/utils/project';
 import { buildEquipmentRows, equipmentCsv, summarizeEquipment, createEquipmentPdf } from '../src/utils/equipmentReport';
 import { example } from './fixture';
+import { fitNotes, getNoteRuns, notesText, sliceNoteRuns, wrapNotes } from '../src/utils/notes';
+import { createCadBlueprintPdf } from '../src/utils/pdfExport';
+
+test('formatted notes round-trip with plain legacy compatibility and reject HTML fields', () => {
+  const runs = [{text:'Título\n',bold:true},{text:'Condiciones ',italic:true},{text:'finales.',underline:true}];
+  const metadata = {...example.metadata,projectNotes:notesText(runs).split('\n'),projectNotesRich:runs};
+  assert.deepEqual(getNoteRuns(validateProject({...example,metadata}).metadata),runs);
+  assert.equal(notesText(getNoteRuns({...metadata,projectNotes:['Actualizado']})),'Actualizado');
+  for (const invalid of [[{text:'A',bold:'yes'}],[{text:'A',html:'<script>'}],['texto']]) {
+    assert.throws(()=>validateProject({...example,metadata:{...metadata,projectNotesRich:invalid}}));
+  }
+});
+
+test('notes continue after five paragraphs without losing text, styles or long words', () => {
+  const runs = [{text:'Uno\nDos\nTres\nCuatro\nCinco\nSeis\n\n',bold:true},{text:'Árboles y preparación del terreno. '+'x'.repeat(120),italic:true,underline:true}];
+  const measure = (text: string, _run: unknown, size: number) => text.length*size*0.5;
+  const fit = fitNotes(runs,100,100,measure);
+  const offset = fit.lines.at(-1)!.endOffset;
+  assert.ok(fit.remainder.length);
+  assert.equal(notesText(runs).slice(0,offset)+notesText(fit.remainder),notesText(runs));
+  assert.equal(notesText(sliceNoteRuns(runs,offset)),notesText(fit.remainder));
+  const lines = wrapNotes(runs,100,14,measure);
+  assert.equal(lines.at(-1)!.endOffset,notesText(runs).length);
+  for (const line of lines) assert.ok(notesText(line.runs).length*7<=100);
+  assert.ok(lines.some(line=>line.runs.some(r=>r.italic&&r.underline)));
+  assert.equal(fitNotes([{text:'Nota breve'}],300,200,measure).remainder.length,0);
+});
+
+test('blueprint PDF adds readable continuation pages only when notes overflow', async () => {
+  const pixel='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4//8/AAX+Av4N70a4AAAAAElFTkSuQmCC';
+  const options={...example,theme:'technical-white' as any,blueprintCanvas:{toDataURL:()=>pixel} as any};
+  const single=await createCadBlueprintPdf(options);
+  assert.equal(single.getNumberOfPages(),1);
+  const runs=[{text:('Nota extensa con énfasis.\n').repeat(120),bold:true,italic:true,underline:true}];
+  const doc=await createCadBlueprintPdf({...options,format:'a4',blueprintCanvas:{toDataURL:()=>pixel,notesContinuation:runs} as any});
+  assert.ok(doc.getNumberOfPages()>=5);
+  assert.match(doc.output(),/Helvetica-BoldOblique/);
+});
 
 test('equipment codes stay unique after deleting an intermediate code', () => {
   assert.equal(nextLabel('CN', [{label:'CN-01'}, {label:'CN-03'}]), 'CN-02');

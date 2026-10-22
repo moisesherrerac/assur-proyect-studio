@@ -159,3 +159,9 @@ Al seleccionar un cerco, **Propiedades** permite cambiar el grosor de línea (1 
 ## Ubicación precisa de elementos
 
 El editor inicia en **Posición libre**: cercos, equipos, textos y vértices se colocan en la posición elegida, sin saltar entre cuadros. El botón inferior alterna entre posición libre y ajuste a cuadrícula; también se cambia con **S**. Si activas el ajuste, el selector contiguo permite pasos de **1, 2, 5, 10, 20, 35 o 70 unidades**. La cuadrícula visible se adapta al zoom para mantener legibilidad y no limita la precisión de colocación. El cambio no desplaza elementos ya guardados.
+
+### Notas del cajetín
+
+El editor de notas permite negrita, cursiva y subrayado mediante selección de texto o al escribir. Conserva los saltos de línea y el formato en las copias editables y en Mis planos. Los proyectos anteriores con notas de texto simple siguen siendo compatibles.
+
+El cajetín distribuye todos los párrafos y ajusta la tipografía hasta un mínimo legible. Si el texto excede el espacio disponible, muestra «CONTINÚA EN ANEXO DE NOTAS» y la exportación añade las hojas necesarias al mismo PDF A3 o A4. El anexo conserva el formato y la referencia de lámina y revisión. No se elimina texto ni se limita el número de párrafos.

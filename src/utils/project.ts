@@ -68,9 +68,13 @@ export function validateProject(value: unknown): any {
   if (d.cameraPreset && !Object.values(d.cameraPreset).every(v => typeof v === 'string')) fail();
   if (m.northAngle !== undefined && !finite(m.northAngle)) fail();
   if (m.projectNotes !== undefined && (!Array.isArray(m.projectNotes) || !m.projectNotes.every((n: unknown) => typeof n === 'string'))) fail();
+  if (m.projectNotesRich !== undefined && (!Array.isArray(m.projectNotesRich) || !m.projectNotesRich.every((r: any) =>
+    r && typeof r === 'object' && typeof r.text === 'string' &&
+    Object.keys(r).every(k => ['text', 'bold', 'italic', 'underline'].includes(k)) &&
+    ['bold', 'italic', 'underline'].every(k => r[k] === undefined || typeof r[k] === 'boolean')))) fail();
   if (m.metersPerUnit != null && (!finite(m.metersPerUnit) || m.metersPerUnit <= 0)) fail();
   for (const [key, v] of Object.entries(m)) {
-    if (!['northAngle', 'metersPerUnit', 'projectNotes'].includes(key) && typeof v !== 'string' && v != null) fail();
+    if (!['northAngle', 'metersPerUnit', 'projectNotes', 'projectNotesRich'].includes(key) && typeof v !== 'string' && v != null) fail();
   }
   for (const key of ['rawImageSrc', 'cadBackgroundImageUrl']) {
     if (d[key] != null && (typeof d[key] !== 'string' || !/^data:image\/(png|jpeg|webp);base64,/i.test(d[key]))) fail();

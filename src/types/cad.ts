@@ -184,6 +184,13 @@ export interface ImageFilterSettings {
   brightness: number; // 50 - 150%
 }
 
+export interface ProjectNoteRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+}
+
 export interface ProjectMetadata {
   metersPerUnit?: number;
   projectName: string;
@@ -202,6 +209,7 @@ export interface ProjectMetadata {
   engineerSignatureDataUrl?: string;
   northAngle?: number; // 0 to 360 degrees rotation for north arrow in plan
   projectNotes: string[];
+  projectNotesRich?: ProjectNoteRun[];
 }
 
 export type ActiveTool = 

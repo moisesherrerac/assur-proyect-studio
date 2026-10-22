@@ -9,14 +9,14 @@ import {
   CadTheme,
   CameraInsertionPreset
 } from '../types/cad';
+import { NotesEditor } from './NotesEditor';
+import { notesText } from '../utils/notes';
 import { buildDynamicSymbology } from '../utils/symbology';
 import {
   FileText,
   Shield,
-  Edit3,
   ChevronRight,
   ChevronLeft,
-  CheckCircle2,
   PenTool,
   Printer,
   FileSpreadsheet,
@@ -59,8 +59,6 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
   setIsOpen
 }) => {
   const [activeTab, setActiveTab] = useState<'glosas' | 'notas' | 'resumen'>('glosas');
-  const [isEditingNotes, setIsEditingNotes] = useState(false);
-  const [tempNotesText, setTempNotesText] = useState(metadata.projectNotes.join('\n'));
 
   const { rows: dynamicSymRows } = buildDynamicSymbology(
     cameras,
@@ -71,11 +69,6 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
     cameraPreset, wiring
   );
 
-  const handleSaveNotes = () => {
-    const lines = tempNotesText.split('\n').filter(l => l.trim().length > 0);
-    setMetadata(prev => ({ ...prev, projectNotes: lines }));
-    setIsEditingNotes(false);
-  };
 
   return (
     <div
@@ -350,53 +343,7 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
             )}
 
             {activeTab === 'notas' && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-700 uppercase text-[11px]">
-                    Notas del Cajetín Lateral
-                  </span>
-                  {!isEditingNotes ? (
-                    <button
-                      onClick={() => {
-                        setTempNotesText(metadata.projectNotes.join('\n'));
-                        setIsEditingNotes(true);
-                      }}
-                      className="flex items-center gap-1 text-[11px] text-sky-600 hover:text-sky-700 font-semibold cursor-pointer"
-                    >
-                      <Edit3 className="w-3 h-3" />
-                      <span>Editar</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleSaveNotes}
-                      className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-semibold cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Guardar</span>
-                    </button>
-                  )}
-                </div>
-
-                {!isEditingNotes ? (
-                  <div className="space-y-2 text-[11px] text-slate-700 font-mono">
-                    {metadata.projectNotes.map((note, idx) => (
-                      <div
-                        key={idx}
-                        className="p-2.5 bg-stone-50 border border-stone-200 rounded-lg"
-                      >
-                        {note}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <textarea
-                    rows={10}
-                    value={tempNotesText}
-                    onChange={e => setTempNotesText(e.target.value)}
-                    className="w-full bg-stone-50 border border-sky-400 rounded-lg p-2.5 text-xs text-slate-900 font-mono focus:outline-none"
-                  />
-                )}
-              </div>
+              <NotesEditor metadata={metadata} onSave={runs => setMetadata(prev => ({ ...prev, projectNotes: notesText(runs).split('\n'), projectNotesRich: runs }))} />
             )}
 
             {activeTab === 'resumen' && (
