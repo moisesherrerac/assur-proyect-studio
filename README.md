@@ -154,3 +154,8 @@ La barra ofrece tres cercos: **C. madera** (café, trazo discontinuo con círcul
 
 
 Al seleccionar un cerco, **Propiedades** permite cambiar el grosor de línea (1 a 10), el código y un texto adicional de hasta 160 caracteres. La etiqueta admite tamaño ajustable, puede mostrarse u ocultarse y se arrastra con **Puntero** sin mover el cerco. **Restablecer posición del texto** devuelve su ubicación inicial. Los avisos eléctricos también pueden mostrarse u ocultarse. Estos ajustes se conservan en el proyecto y en la lámina exportada.
+
+
+## Ubicación precisa de elementos
+
+El editor inicia en **Posición libre**: cercos, equipos, textos y vértices se colocan en la posición elegida, sin saltar entre cuadros. El botón inferior alterna entre posición libre y ajuste a cuadrícula; también se cambia con **S**. Si activas el ajuste, el selector contiguo permite pasos de **1, 2, 5, 10, 20, 35 o 70 unidades**. La cuadrícula visible se adapta al zoom para mantener legibilidad y no limita la precisión de colocación. El cambio no desplaza elementos ya guardados.

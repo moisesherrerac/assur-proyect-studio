@@ -18,6 +18,7 @@ import {
 } from '../types/cad';
 import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
+import { GRID_STEPS, placePlanPoint, visibleGridStep } from '../utils/placement';
 import { drawFenceLabel, fenceLabelLayout, fenceLabelAnchor, drawFencePath, fenceProfile, fenceTypeForTool, isElectricFenceTool } from '../utils/fences';
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
@@ -115,9 +116,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   theme,
   showFov,
   showGrid,
-  snapToGrid = true,
+  snapToGrid = false,
   setSnapToGrid,
-  gridSize = 20,
+  gridSize = 5,
   setGridSize,
   layers = {
     mapBackground: true,
@@ -255,14 +256,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   // Snap a world coordinate to the CAD Grid relative to MAP_X, MAP_Y origin
   const snapPoint = useCallback(
     (pt: FencePoint, forceDisable = false): FencePoint => {
-      if (!snapToGrid || forceDisable) {
-        return { x: Math.round(pt.x), y: Math.round(pt.y) };
-      }
-      const step = Math.max(5, gridSize);
-      return {
-        x: Math.round(MAP_X + Math.round((pt.x - MAP_X) / step) * step),
-        y: Math.round(MAP_Y + Math.round((pt.y - MAP_Y) / step) * step)
-      };
+      return placePlanPoint(pt,snapToGrid&&!forceDisable,gridSize,{x:MAP_X,y:MAP_Y});
     },
     [snapToGrid, gridSize]
   );
@@ -495,27 +489,28 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 
       // Draw Fine Architectural CAD Coordinate Grid over the Orthophoto
       if ((showGrid || (snapToGrid && !isExportMode)) && layers.grid) {
-        // Minor Snap Subdivision Grid (only in interactive view when Snap-to-Grid is enabled)
-        if (snapToGrid && !isExportMode && gridSize < 70) {
+        const guideStep = visibleGridStep(gridSize,zoom);
+        // Screen guides never force positions; free placement remains fully continuous.
+        if (!isExportMode) {
           ctx.strokeStyle = isDarkSheet
             ? 'rgba(56, 189, 248, 0.11)'
-            : 'rgba(100, 116, 139, 0.16)';
+            : 'rgba(100, 116, 139, 0.11)';
           ctx.lineWidth = 0.5;
           ctx.beginPath();
-          for (let gx = MAP_X; gx <= MAP_X + MAP_W; gx += gridSize) {
+          for (let gx = MAP_X; gx <= MAP_X + MAP_W; gx += guideStep) {
             ctx.moveTo(gx, MAP_Y);
             ctx.lineTo(gx, MAP_Y + MAP_H);
           }
-          for (let gy = MAP_Y; gy <= MAP_Y + MAP_H; gy += gridSize) {
+          for (let gy = MAP_Y; gy <= MAP_Y + MAP_H; gy += guideStep) {
             ctx.moveTo(MAP_X, gy);
             ctx.lineTo(MAP_X + MAP_W, gy);
           }
           ctx.stroke();
         }
 
-        // Major Coordinate Grid (70px = 7m)
+        // Printed guides retain their spacing; interactive guides adapt to zoom.
         if (showGrid) {
-          const gridStep = 70;
+          const gridStep = isExportMode ? 70 : guideStep*5;
           ctx.strokeStyle = isDarkSheet
             ? 'rgba(56, 189, 248, 0.24)'
             : 'rgba(100, 116, 139, 0.34)';
@@ -1693,6 +1688,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     },
     [
       theme,
+      zoom,
       layers,
       locks,
       showGrid,
@@ -1928,7 +1924,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         id: `struct-${Date.now()}`,
         type: isPerim ? 'perimeter' : 'building',
         label: isPerim ? `PERÍMETRO 0${nextNum}` : `ESTRUCTURA / NAVE 0${nextNum}`,
-        points: currentPoints.map(p => ({ x: Math.round(p.x), y: Math.round(p.y) })),
+        points: currentPoints.map(p => ({ ...p })),
         closed: currentPoints.length >= 3,
         strokeColor: '#0f172a',
         strokeWidth: isPerim ? 2.8 : 2.5,
@@ -2315,17 +2311,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     if (draggingStructureBody) {
       const rawDx = rawWorldPt.x - draggingStructureBody.startWorld.x;
       const rawDy = rawWorldPt.y - draggingStructureBody.startWorld.y;
-      const step = snapToGrid ? Math.max(5, gridSize) : 1;
-      const dx = Math.round(rawDx / step) * step;
-      const dy = Math.round(rawDy / step) * step;
+      const {x:dx,y:dy}=placePlanPoint({x:rawDx,y:rawDy},snapToGrid,gridSize);
       setStructures(prev =>
         prev.map(s =>
           s.id === draggingStructureBody.id
             ? {
                 ...s,
                 points: draggingStructureBody.initialPoints.map(p => ({
-                  x: Math.round(p.x + dx),
-                  y: Math.round(p.y + dy)
+                  x: p.x + dx,
+                  y: p.y + dy
                 }))
               }
             : s
@@ -2694,7 +2688,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         <div className="h-4 w-px bg-stone-200 mx-0.5" />
         <button
           onClick={() => setSnapToGrid?.(!snapToGrid)}
-          title="Activar/Desactivar Ajuste a Grilla / Snap-to-Grid (Tecla S)"
+          title="Alternar posición libre y ajuste a la cuadrícula (S)"
+          aria-pressed={snapToGrid}
           className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg transition-colors cursor-pointer font-semibold ${
             snapToGrid
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-300'
@@ -2702,8 +2697,11 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           }`}
         >
           <Magnet className={`w-3.5 h-3.5 ${snapToGrid ? 'text-emerald-600' : 'text-slate-400'}`} />
-          <span>Snap {snapToGrid ? `${gridSize}px` : 'Off'}</span>
+          <span>{snapToGrid ? `Ajuste: ${gridSize} u` : 'Posición libre'}</span>
         </button>
+        {snapToGrid && <select aria-label="Paso de ajuste a la cuadrícula" className="bg-white border border-stone-300 rounded px-1 py-1 text-xs" value={gridSize} onChange={e=>setGridSize?.(Number(e.target.value))}>
+          {GRID_STEPS.map(n=><option key={n} value={n}>{n} u</option>)}
+        </select>}
         <div className="h-4 w-px bg-stone-200 mx-0.5" />
         <button
           onClick={() => {
@@ -2759,12 +2757,12 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           <>
             <span>·</span>
             <span className="text-emerald-700 font-mono font-bold">
-              OSNAP GRILLA ({gridSize}px)
+              AJUSTE A CUADRÍCULA ({gridSize} u)
             </span>
           </>
         )}
         <span>·</span>
-        <span>Tecla S: Snap</span>
+        <span>{snapToGrid ? 'S: posición libre' : 'POSICIÓN LIBRE · S: ajustar a cuadrícula'}</span>
         <span>·</span>
         <span>Rueda: Zoom</span>
       </div>

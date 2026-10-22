@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { GRID_STEPS } from '../utils/placement';
 import type { CadTheme } from '../types/cad';
 import { AssurLogo } from './AssurLogo';
 import { Save, FolderOpen, Upload, Undo2, Redo2, FileDown, FileText, ChevronDown, Ruler } from 'lucide-react';
@@ -37,8 +38,8 @@ export const Toolbar: React.FC<ToolbarProps> = p => {
           <button className="action-button w-full" onClick={() => {p.onToggleLayers();setViewOpen(false);}}>{p.isLayersOpen ? 'Cerrar capas' : 'Abrir capas'}</button>
           <label className="flex gap-2"><input type="checkbox" checked={p.showFov} onChange={e=>p.setShowFov(e.target.checked)}/>Mostrar conos de visión</label>
           <label className="flex gap-2"><input type="checkbox" checked={p.showGrid} onChange={e=>p.setShowGrid(e.target.checked)}/>Mostrar retícula</label>
-          <label className="flex gap-2"><input type="checkbox" checked={p.snapToGrid} onChange={e=>p.setSnapToGrid(e.target.checked)}/>Ajustar a grilla</label>
-          <label className="block">Paso de grilla (unidades)<select className="form-control" value={p.gridSize} onChange={e=>p.setGridSize(Number(e.target.value))}>{[10,20,35,70].map(n=><option key={n} value={n}>{n} u</option>)}</select></label>
+          <label className="flex gap-2"><input type="checkbox" checked={p.snapToGrid} onChange={e=>p.setSnapToGrid(e.target.checked)}/>Ajustar posiciones a la cuadrícula</label>
+          <label className="block">Paso de ajuste (unidades)<select className="form-control" value={p.gridSize} onChange={e=>p.setGridSize(Number(e.target.value))}>{GRID_STEPS.map(n=><option key={n} value={n}>{n} u</option>)}</select></label>
           <label className="block">Estilo del plano<select className="form-control" value={p.theme} onChange={e=>p.setTheme(e.target.value as CadTheme)}>
             <option value="technical-orthophoto">Ortofoto clara</option><option value="orthophoto-hybrid">Ortofoto y bordes</option><option value="architectural-white">Papel blanco</option><option value="autocad-dark">Fondo oscuro</option><option value="blueprint-blue">Blueprint azul</option>
           </select></label>

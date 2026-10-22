@@ -112,3 +112,25 @@ test('invalid fence line and label settings are rejected before loading',()=>{
   for(const patch of [{strokeWidth:0},{strokeWidth:11},{labelFontSize:30},{labelText:'x'.repeat(161)},{showLabel:'true'},{showWarningSigns:1}])
     assert.throws(()=>validateProject({...example,fences:[{...example.fences[0],...patch}]}));
 });
+
+
+import {placePlanPoint,visibleGridStep} from '../src/utils/placement';
+test('free placement preserves exact positions instead of forcing coarse grid coordinates',()=>{
+  const point={x:117.375,y:221.625};
+  assert.deepEqual(placePlanPoint(point),point);
+  assert.deepEqual(placePlanPoint(point,false,70,{x:52,y:52}),point);
+  assert.notEqual(placePlanPoint({x:117.375,y:221.625}).x,placePlanPoint({x:118.375,y:221.625}).x);
+});
+test('fine grid supports one and two unit placement using the plan origin',()=>{
+  const origin={x:52,y:52};
+  assert.deepEqual(placePlanPoint({x:58.2,y:59.3},true,1,origin),{x:58,y:59});
+  assert.deepEqual(placePlanPoint({x:58.2,y:59.3},true,2,origin),{x:58,y:60});
+  assert.deepEqual(placePlanPoint({x:58.2,y:59.3},true,5,origin),{x:57,y:57});
+});
+test('guide density changes with zoom while fine placement resolution stays fixed',()=>{
+  for(const zoom of [0.2,0.5,1,4.5]){
+    const guide=visibleGridStep(1,zoom);
+    assert.ok(guide*zoom>=10);assert.ok(guide<=Math.ceil(10/zoom));
+    assert.deepEqual(placePlanPoint({x:101.1,y:102.2},true,1),{x:101,y:102});
+  }
+});

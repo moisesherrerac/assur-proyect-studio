@@ -124,8 +124,8 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
 
   const [showFov, setShowFov] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
-  const [snapToGrid, setSnapToGrid] = useState(true);
-  const [gridSize, setGridSize] = useState<number>(20);
+  const [snapToGrid, setSnapToGrid] = useState(false);
+  const [gridSize, setGridSize] = useState<number>(5);
   const [theme, setTheme] = useState<CadTheme>(
     initialSavedData?.theme || 'technical-orthophoto'
   );
