@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import {
   ActiveTool,
   CameraDevice,
@@ -16,6 +16,7 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from '../types/cad';
+import { minimumVertices } from '../utils/workspace';
 import { fitNotes, getNoteRuns } from '../utils/notes';
 import { drawFittedText } from '../utils/canvasText';
 import { nextLabel, distanceLabel } from '../utils/project';
@@ -24,6 +25,7 @@ import { drawFenceLabel, fenceLabelLayout, fenceLabelAnchor, drawFencePath, fenc
 import { buildDynamicSymbology, DynamicSymbologyRow } from '../utils/symbology';
 import {
   Check,
+  X,
   ZoomIn,
   ZoomOut,
   Maximize2,
@@ -40,6 +42,12 @@ import {
 import { computePlanFramingBounds, MAP_X, MAP_Y, MAP_W, MAP_H } from '../utils/framing';
 
 interface CanvasEditorProps {
+  readOnly?: boolean;
+  showHelp?: boolean;
+  onHideHelp?: () => void;
+  showCoordinates?: boolean;
+  showViewControls?: boolean;
+  onHideViewControls?: () => void;
   cadBackgroundImageUrl: string | null;
   activeTool: ActiveTool;
   setActiveTool: (tool: ActiveTool) => void;
@@ -92,6 +100,7 @@ export const SHEET_H = 1555;
 export { MAP_X, MAP_Y, MAP_W, MAP_H };
 
 export const CanvasEditor: React.FC<CanvasEditorProps> = ({
+  readOnly = false, showHelp = true, onHideHelp, showCoordinates = false, showViewControls = true, onHideViewControls,
   cadBackgroundImageUrl,
   activeTool,
   setActiveTool,
@@ -158,6 +167,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const noteRuns = useMemo(() => getNoteRuns(metadata), [metadata.projectNotes, metadata.projectNotesRich]);
+  const noteLayoutRef = useRef<{runs: typeof noteRuns; height: number; fontReady: boolean; fit: ReturnType<typeof fitNotes>} | null>(null);
 
   const [zoom, setZoom] = useState<number>(0.65);
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 20, y: 20 });
@@ -185,6 +196,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   const [measurePoints, setMeasurePoints] = useState<FencePoint[]>([]);
   const [knownDistance, setKnownDistance] = useState('');
   const [calibrationError, setCalibrationError] = useState('');
+  useEffect(() => { setCurrentPoints([]); setMeasurePoints([]); setCalibrationError(''); }, [activeTool]);
 
   const [bgImgLoaded, setBgImgLoaded] = useState<number>(0);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
@@ -1604,10 +1616,15 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       ctx.textAlign = 'left';
       const noteBottom = sideBottom - 370 - (sigImageRef.current ? 70 : 16);
       const noteFont = (run: { bold?: boolean; italic?: boolean }, size: number) => `${run.italic ? 'italic ' : ''}${run.bold ? 700 : 400} ${size}px "Chakra Petch", Arial, sans-serif`;
-      const fittedNotes = fitNotes(getNoteRuns(metadata), sideW - 28, noteBottom - curY, (text, run, size) => {
+      const noteHeight = noteBottom - curY;
+      const fontReady = document.fonts.check('14px "Chakra Petch"');
+      const cachedNotes = noteLayoutRef.current;
+      const fittedNotes = cachedNotes?.runs === noteRuns && cachedNotes.height === noteHeight && cachedNotes.fontReady === fontReady
+        ? cachedNotes.fit : fitNotes(noteRuns, sideW - 28, noteHeight, (text, run, size) => {
         ctx.font = noteFont(run, size);
         return ctx.measureText(text).width;
       });
+      noteLayoutRef.current = {runs: noteRuns, height: noteHeight, fontReady, fit: fittedNotes};
       for (const line of fittedNotes.lines) {
         let x = sideX + 14;
         ctx.textBaseline = 'alphabetic';
@@ -1706,7 +1723,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       measurePoints,
       activeTool,
       metadata,
-      bgImgLoaded
+      bgImgLoaded, noteRuns
     ]
   );
 
@@ -1753,6 +1770,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   }, [pan, zoom, renderCadSheet]);
 
   const handleWheel = (e: React.WheelEvent) => {
+    if (e.target !== canvasRef.current) return;
     e.preventDefault();
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -1905,11 +1923,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
 
   const finishCurrentPolyline = () => {
-    if (currentPoints.length < 2) {
-      setCurrentPoints([]);
-      setActiveTool('select');
-      return;
-    }
+    if (currentPoints.length < minimumVertices(activeTool)) return;
 
     if (activeTool === 'draw-building' || activeTool === 'draw-perimeter') {
       const isPerim = activeTool === 'draw-perimeter';
@@ -1978,6 +1992,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       setStartPan({ x: screenX - pan.x, y: screenY - pan.y });
       return;
     }
+
+    if (readOnly) return;
 
     if (e.button === 0) {
       if (activeTool === 'measure') {
@@ -2239,13 +2255,14 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    if (e.target !== canvasRef.current) return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
     const rawWorldPt = screenToWorld(screenX, screenY);
     const snappedCursor = snapPoint(rawWorldPt);
-    setCursorPos(snappedCursor);
+    if (activeTool !== 'select' || showCoordinates) setCursorPos(prev => prev.x === snappedCursor.x && prev.y === snappedCursor.y ? prev : snappedCursor);
 
     if (isPanning) {
       setPan({ x: screenX - startPan.x, y: screenY - startPan.y });
@@ -2418,7 +2435,8 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (document.querySelector('[role="dialog"]')) return;
       const activeEl = document.activeElement?.tagName.toLowerCase();
-      const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select';
+      const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select' || (document.activeElement as HTMLElement)?.isContentEditable;
+      if (isTyping || readOnly) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedId && !isTyping) {
@@ -2434,23 +2452,23 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
           setSelectedId(null);
         }
       } else if (e.key === 'Enter') {
-        if (currentPoints.length >= 2) {
+        if (currentPoints.length >= minimumVertices(activeTool)) {
           finishCurrentPolyline();
         }
       } else if (e.key === 'Escape') {
         setCurrentPoints([]);
         setMeasurePoints([]);
         setActiveTool('select');
-      } else if ((e.key === 'l' || e.key === 'L') && !isTyping) {
+      } else if ((e.key === 'l' || e.key === 'L') && !e.ctrlKey && !e.metaKey) {
         onToggleLayerManager?.();
-      } else if ((e.key === 's' || e.key === 'S' || e.key === 'F9') && !isTyping) {
+      } else if ((e.key === 's' || e.key === 'S' || e.key === 'F9') && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
         setSnapToGrid?.(!snapToGrid);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedId, currentPoints, activeTool, onToggleLayerManager, snapToGrid, setSnapToGrid, onUndo, onRedo]);
+  }, [selectedId, currentPoints, activeTool, onToggleLayerManager, snapToGrid, setSnapToGrid, onUndo, onRedo, readOnly]);
 
   useEffect(() => {
     const canvas = canvasRef.current as any;
@@ -2475,10 +2493,18 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
     activeTool === 'siren-strobe' ||
     activeTool === 'rack-cabinet';
 
+  const toolStatus = currentPoints.length ? `Trazando ${isElectricFenceTool(activeTool) ? 'cerco' : activeTool === 'wiring-conduit' ? 'ruta' : 'estructura'} · ${currentPoints.length} ${currentPoints.length === 1 ? 'punto' : 'puntos'}` : isPlacingDevices ? 'Haz clic para ubicar el equipo' : activeTool === 'measure' ? 'Medición' : activeTool === 'select' ? '' : 'Marca los puntos en el plano';
+  const cancelTool = () => { setCurrentPoints([]); setMeasurePoints([]); setActiveTool('select'); };
   return (
+    <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-hidden">
+      {toolStatus && <div role="status" className="canvas-tool-status shrink-0 flex items-center flex-wrap gap-2 bg-slate-50 border-b border-stone-200 px-3 py-1 text-xs text-slate-700">
+        <span className="flex-1">{toolStatus}</span>
+        {currentPoints.length > 0 && <button className="action-button" disabled={currentPoints.length < minimumVertices(activeTool)} onClick={finishCurrentPolyline}><Check size={14}/>Finalizar (Enter)</button>}
+        <button className="action-button" aria-label="Cancelar herramienta" onClick={cancelTool}><X size={14}/>{isPlacingDevices ? 'Terminar' : 'Cancelar'} (Esc)</button>
+      </div>}
     <div
       ref={containerRef}
-      className="relative min-w-0 min-h-0 w-full h-full flex-1 overflow-hidden select-none cursor-crosshair bg-stone-200"
+      className="cad-canvas-area relative min-w-0 min-h-0 w-full h-full flex-1 overflow-hidden select-none cursor-crosshair bg-stone-200"
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
@@ -2500,8 +2526,9 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         }
       }}
       onContextMenu={e => {
+        if (e.target !== canvasRef.current) return;
         e.preventDefault();
-        if (currentPoints.length >= 2) {
+        if (currentPoints.length >= minimumVertices(activeTool)) {
           finishCurrentPolyline();
         } else {
           setCurrentPoints([]);
@@ -2512,18 +2539,19 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
       <canvas ref={canvasRef} className="absolute inset-0 block w-full h-full" />
 
       {/* Primary Welcoming Empty State when no plan is attached yet */}
-      {!cadBackgroundImageUrl && structures.length === 0 && cameras.length === 0 && (
+      {showHelp && !cadBackgroundImageUrl && [structures, cameras, fences, wiring, antennas, audioAlarms, annotations].every(items => items.length === 0) && activeTool === 'select' && (
         <div className="absolute inset-0 flex items-center justify-center p-4 pointer-events-none z-20">
-          <div className="bg-white/95 border border-stone-200 rounded-2xl p-7 shadow-xl max-w-md text-center space-y-4 pointer-events-auto backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative bg-white border border-stone-200 rounded-xl p-6 shadow-xl max-w-md text-center space-y-4 pointer-events-auto backdrop-blur-md animate-in fade-in zoom-in-95 duration-200">
+            <button aria-label="Cerrar ayuda inicial" onClick={onHideHelp} className="absolute top-2 right-2 p-2 text-slate-600 hover:bg-stone-100 rounded"><X size={16}/></button>
             <div className="w-14 h-14 rounded-2xl bg-sky-50 border border-sky-200 text-sky-600 flex items-center justify-center mx-auto shadow-xs">
               <Upload className="w-7 h-7" />
             </div>
             <div className="space-y-1">
               <h2 className="text-base font-bold text-slate-900">
-                Adjunta tu Plano o Captura para Comenzar
+                Carga un plano para comenzar
               </h2>
               <p className="text-xs text-slate-500 leading-relaxed">
-                El encuadre y las estructuras se adaptarán exactamente a las dimensiones de tu imagen. Podrás ubicar cámaras una a una. Guarda en Mis planos para conservar el proyecto entre computadores.
+                Carga una imagen, abre un proyecto guardado o empieza a dibujar con las herramientas.
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-1">
@@ -2533,7 +2561,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                 className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl text-xs shadow-xs transition-colors cursor-pointer"
               >
                 <Upload className="w-4 h-4" />
-                <span>Adjuntar Captura de Google Maps o Plano</span>
+                <span>Cargar imagen del plano</span>
               </button>
               {onLoadProjectJson && (
                 <button
@@ -2542,7 +2570,7 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
                   className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-stone-100 hover:bg-stone-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   <FolderOpen className="w-4 h-4 text-amber-600" />
-                  <span>Cargar Proyecto Guardado (.cadmap)</span>
+                  <span>Abrir proyecto (.cadmap)</span>
                 </button>
               )}
             </div>
@@ -2553,83 +2581,28 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         </div>
       )}
 
-      {/* Guided Banner when placing cameras/devices one by one */}
-      {isPlacingDevices && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-white/95 border border-stone-300 rounded-xl px-4 py-2 shadow-lg backdrop-blur-md text-slate-800">
-          <div className="flex items-center gap-2 text-xs font-medium">
-            <span
-              className="w-3.5 h-3.5 rounded-sm border border-black/20 shrink-0"
-              style={{
-                backgroundColor: activeTool.startsWith('camera-')
-                  ? cameraPreset.color
-                  : '#eab308'
-              }}
-            />
-            <span>
-              Haz clic en el plano para ir ubicando{' '}
-              <strong className="text-slate-900">
-                {activeTool.startsWith('camera-')
-                  ? `Cámaras (${cameraPreset.categoryLabel})`
-                  : 'Equipos'}
-              </strong>{' '}
-              una a una
-            </span>
-          </div>
-          <button
-            onClick={() => setActiveTool('select')}
-            className="flex items-center gap-1 px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer"
-          >
-            <MousePointer className="w-3 h-3" />
-            <span>Listo (Esc)</span>
-          </button>
-        </div>
-      )}
+      {/* Live CAD Coordinate & Snap Status HUD */}
+      {activeTool === 'measure' && <div className="absolute top-3 left-3 z-20 w-80 max-w-[calc(100%-24px)] bg-white rounded-lg border border-stone-300 p-3 shadow-md text-sm" onMouseDown={e => e.stopPropagation()} onMouseMove={e => e.stopPropagation()}>
+        <div className="flex justify-between gap-2"><p className="font-semibold">Medir y calibrar</p><button aria-label="Cerrar medición" onClick={cancelTool} className="p-1 rounded hover:bg-stone-100"><X size={16}/></button></div>
+        <p className="text-xs text-slate-600 mt-1">Marca dos puntos de distancia conocida. Un tercer clic inicia otra medición.</p>
+        {measurePoints.length === 2 && <form className="flex flex-wrap gap-2 items-end mt-2" onSubmit={e => {
+          e.preventDefault();
+          const meters = Number(knownDistance.replace(',', '.'));
+          const units = Math.hypot(measurePoints[1].x-measurePoints[0].x, measurePoints[1].y-measurePoints[0].y);
+          if (!Number.isFinite(meters) || meters <= 0 || units < 1 || meters > 1e7) { setCalibrationError('Ingresa una distancia positiva y marca dos puntos diferentes.'); return; }
+          setMetadata?.(prev => ({ ...prev, metersPerUnit: meters / units, scale: 'S/E' }));
+          setCalibrationError('Distancia calibrada. La escala de impresión sigue siendo S/E.');
+        }}>
+          <label className="text-xs">Distancia real (m)<input aria-label="Distancia real en metros" className="form-control max-w-36" inputMode="decimal" value={knownDistance} onChange={e=>setKnownDistance(e.target.value)}/></label>
+          <button className="action-button" type="submit">Calibrar</button>
+        </form>}
+        {calibrationError && <p role="status" className="text-xs mt-2">{calibrationError}</p>}
+        <button className="underline text-xs mt-2" onClick={() => {setActiveTool('select');setMeasurePoints([]);}}>Terminar medición</button>
+      </div>}
 
-      {/* Subtle Empty State Helper when 0 cameras are placed and user is in Select mode */}
-      {cameras.length === 0 && !isPlacingDevices && currentPoints.length === 0 && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-20 flex items-center gap-3 bg-white/95 border border-stone-200 rounded-xl px-4 py-2 shadow-md text-xs text-slate-700">
-          <Video className="w-4 h-4 text-sky-600 shrink-0" />
-          <span>
-            Plano limpio sin cámaras precargadas. Elige color/criterio arriba y haz clic en{' '}
-            <strong className="text-slate-900">+ Ubicar Cámara</strong> para situarlas una a una.
-          </span>
-          <button
-            type="button"
-            onClick={() => setActiveTool('camera-bullet-new')}
-            className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap"
-          >
-            + Empezar a Ubicar
-          </button>
-        </div>
-      )}
-
-      {currentPoints.length > 0 && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-3 bg-white/95 border border-sky-400 rounded-xl px-4 py-2.5 shadow-xl backdrop-blur-md text-slate-800">
-          <div className="flex items-center gap-2 text-sky-700 font-mono text-xs font-semibold">
-            <span>
-              Trazando{' '}
-              {activeTool === 'draw-building'
-                ? 'Estructura / Nave'
-                : activeTool === 'draw-perimeter'
-                ? 'Perímetro Predial'
-                : isElectricFenceTool(activeTool)
-                ? `Cerco ${fenceProfile(fenceTypeForTool(activeTool)).label.toLowerCase()}`
-                : 'Ruta'}
-              : {currentPoints.length} vértices
-            </span>
-          </div>
-          <button
-            onClick={finishCurrentPolyline}
-            className="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-all cursor-pointer"
-          >
-            <Check className="w-3.5 h-3.5" />
-            <span>Finalizar (Enter)</span>
-          </button>
-        </div>
-      )}
-
+    </div>
       {/* Floating Canvas View Controls (Friendly Light Studio Style) */}
-      <div className="absolute bottom-5 right-3 z-20 flex items-center gap-1 max-w-[calc(100%-24px)] overflow-x-auto whitespace-nowrap [&>button]:shrink-0 bg-white/95 border border-stone-200/90 rounded-xl p-1.5 shadow-lg backdrop-blur-md text-slate-700">
+      {showViewControls && <div role="toolbar" aria-label="Controles de vista" className="canvas-view-controls shrink-0 flex items-center gap-1 overflow-x-auto whitespace-nowrap [&>button]:shrink-0 bg-white border-t border-stone-200 px-2 py-1 text-slate-700">
         <button
           onClick={() => setZoom(prev => Math.min(prev * 1.2, 4.5))}
           title="Acercar (Zoom +)"
@@ -2655,33 +2628,6 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         </button>
         <div className="h-4 w-px bg-stone-200 mx-0.5" />
         <button
-          onClick={onUndo}
-          disabled={!canUndo}
-          title="Volver atrás / Deshacer último cambio (Ctrl+Z)"
-          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg transition-colors font-semibold ${
-            canUndo
-              ? 'text-slate-700 hover:text-slate-900 hover:bg-stone-100 cursor-pointer'
-              : 'text-slate-300 cursor-not-allowed opacity-40 select-none'
-          }`}
-        >
-          <Undo2 className="w-3.5 h-3.5 text-sky-700" />
-          <span className="hidden md:inline">Deshacer</span>
-        </button>
-        <button
-          onClick={onRedo}
-          disabled={!canRedo}
-          title="Volver adelante / Rehacer cambio (Ctrl+Y o Ctrl+Shift+Z)"
-          className={`flex items-center gap-1 px-2 py-1.5 text-xs rounded-lg transition-colors font-semibold ${
-            canRedo
-              ? 'text-slate-700 hover:text-slate-900 hover:bg-stone-100 cursor-pointer'
-              : 'text-slate-300 cursor-not-allowed opacity-40 select-none'
-          }`}
-        >
-          <Redo2 className="w-3.5 h-3.5 text-sky-700" />
-          <span className="hidden md:inline">Rehacer</span>
-        </button>
-        <div className="h-4 w-px bg-stone-200 mx-0.5" />
-        <button
           onClick={() => setSnapToGrid?.(!snapToGrid)}
           title="Alternar posición libre y ajuste a la cuadrícula (S)"
           aria-pressed={snapToGrid}
@@ -2697,70 +2643,13 @@ export const CanvasEditor: React.FC<CanvasEditorProps> = ({
         {snapToGrid && <select aria-label="Paso de ajuste a la cuadrícula" className="bg-white border border-stone-300 rounded px-1 py-1 text-xs" value={gridSize} onChange={e=>setGridSize?.(Number(e.target.value))}>
           {GRID_STEPS.map(n=><option key={n} value={n}>{n} u</option>)}
         </select>}
-        <div className="h-4 w-px bg-stone-200 mx-0.5" />
-        <button
-          onClick={() => {
-            const nextAngle = ((metadata.northAngle || 0) + 45) % 360;
-            setMetadata?.(prev => ({ ...prev, northAngle: nextAngle }));
-          }}
-          title={`Girar Flecha del Norte del Plano: ${Math.round(metadata.northAngle || 0)}° (Clic para rotar +45°)`}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-purple-700 bg-purple-50/70 hover:bg-purple-100 rounded-lg transition-colors cursor-pointer font-semibold border border-purple-200 shadow-2xs"
-        >
-          <Compass
-            className="w-3.5 h-3.5 text-purple-700 transition-transform duration-200"
-            style={{ transform: `rotate(${metadata.northAngle || 0}deg)` }}
-          />
-          <span>Norte {Math.round(metadata.northAngle || 0)}°</span>
-        </button>
-        <div className="h-4 w-px bg-stone-200 mx-0.5" />
-        <button
-          onClick={onToggleLayerManager}
-          title="Gestor de Capas CAD (Tecla L)"
-          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-slate-700 hover:text-slate-900 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer font-semibold"
-        >
-          <Layers className="w-4 h-4 text-sky-600" />
-          <span>Capas</span>
-        </button>
         <span className="text-[11px] font-mono text-slate-500 px-2 tabular-nums">
           {Math.round(zoom * 100)}%
         </span>
-      </div>
-
-      {/* Live CAD Coordinate & Snap Status HUD */}
-      {activeTool === 'measure' && <div className="absolute top-3 left-3 z-20 max-w-[calc(100%-24px)] bg-white rounded-lg border border-stone-300 p-3 shadow-md text-sm" onMouseDown={e => e.stopPropagation()} onMouseMove={e => e.stopPropagation()}>
-        <p className="font-semibold">Medir y calibrar distancia</p>
-        <p className="text-xs text-slate-600 mt-1">Marca dos puntos de distancia conocida. Un tercer clic inicia otra medición.</p>
-        {measurePoints.length === 2 && <form className="flex flex-wrap gap-2 items-end mt-2" onSubmit={e => {
-          e.preventDefault();
-          const meters = Number(knownDistance.replace(',', '.'));
-          const units = Math.hypot(measurePoints[1].x-measurePoints[0].x, measurePoints[1].y-measurePoints[0].y);
-          if (!Number.isFinite(meters) || meters <= 0 || units < 1 || meters > 1e7) { setCalibrationError('Ingresa una distancia positiva y marca dos puntos diferentes.'); return; }
-          setMetadata?.(prev => ({ ...prev, metersPerUnit: meters / units, scale: 'S/E' }));
-          setCalibrationError('Distancia calibrada. La escala de impresión sigue siendo S/E.');
-        }}>
-          <label className="text-xs">Distancia real (m)<input aria-label="Distancia real en metros" className="form-control max-w-36" inputMode="decimal" value={knownDistance} onChange={e=>setKnownDistance(e.target.value)}/></label>
-          <button className="action-button" type="submit">Calibrar</button>
-        </form>}
-        {calibrationError && <p role="status" className="text-xs mt-2">{calibrationError}</p>}
-        <button className="underline text-xs mt-2" onClick={() => {setActiveTool('select');setMeasurePoints([]);}}>Terminar medición</button>
+        <button className="ml-auto p-2 rounded hover:bg-stone-100" aria-label="Ocultar controles de vista" onClick={() => { onHideViewControls?.(); }}><X size={16}/></button>
       </div>}
-      <div className="absolute bottom-5 left-5 z-10 pointer-events-none hidden lg:flex items-center gap-3 text-[11px] font-medium text-slate-600 bg-white/95 px-3.5 py-1.5 rounded-lg border border-stone-200 shadow-xs backdrop-blur-xs">
-        <span className="font-mono font-semibold text-slate-800 tabular-nums">
-          X: {Math.round(cursorPos.x)} · Y: {Math.round(cursorPos.y)}
-        </span>
-        {snapToGrid && (
-          <>
-            <span>·</span>
-            <span className="text-emerald-700 font-mono font-bold">
-              AJUSTE A CUADRÍCULA ({gridSize} u)
-            </span>
-          </>
-        )}
-        <span>·</span>
-        <span>{snapToGrid ? 'S: posición libre' : 'POSICIÓN LIBRE · S: ajustar a cuadrícula'}</span>
-        <span>·</span>
-        <span>Rueda: Zoom</span>
-      </div>
+
+      {showCoordinates && <div className="shrink-0 flex items-center gap-3 px-3 py-1 bg-stone-50 text-xs text-slate-600 border-t border-stone-200"><span className="font-mono">X: {Math.round(cursorPos.x)} · Y: {Math.round(cursorPos.y)}</span><span>{snapToGrid ? `Ajuste: ${gridSize} u` : 'Posición libre'}</span></div>}
     </div>
   );
 };

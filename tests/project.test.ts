@@ -172,3 +172,20 @@ test('guide density changes with zoom while fine placement resolution stays fixe
     assert.deepEqual(placePlanPoint({x:101.1,y:102.2},true,1),{x:101,y:102});
   }
 });
+
+
+test('layer route totals use real geometry and the same project calibration as the report', async () => {
+  const {routeLength}=await import('../src/utils/workspace');
+  const units=routeLength([{points:[{x:0,y:0},{x:30,y:40},{x:60,y:40}]},{points:[]}]);
+  assert.equal(units,80);
+  assert.equal(distanceLabel(units,0.25),'20 m');
+  assert.match(distanceLabel(units),/80 u · sin calibrar/);
+});
+
+test('a polygon needs three points and a fence or route needs two', async () => {
+  const {minimumVertices}=await import('../src/utils/workspace');
+  assert.equal(minimumVertices('draw-building'),3);
+  assert.equal(minimumVertices('draw-perimeter'),3);
+  assert.equal(minimumVertices('electric-fence-madera'),2);
+  assert.equal(minimumVertices('wiring-conduit'),2);
+});

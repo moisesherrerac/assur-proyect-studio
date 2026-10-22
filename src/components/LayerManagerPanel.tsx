@@ -1,4 +1,6 @@
 import React from 'react';
+import { routeLength } from '../utils/workspace';
+import { distanceLabel } from '../utils/project';
 import {
   LayerVisibility,
   LayerLocks,
@@ -29,6 +31,7 @@ import {
 } from 'lucide-react';
 
 interface LayerManagerPanelProps {
+  metersPerUnit?: number;
   isOpen: boolean;
   onClose: () => void;
   layers: LayerVisibility;
@@ -44,6 +47,7 @@ interface LayerManagerPanelProps {
 }
 
 export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
+  metersPerUnit,
   isOpen,
   onClose,
   layers,
@@ -62,23 +66,8 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
   const nuevasCount = cameras.filter(c => c.status === 'nueva').length;
   const existCount = cameras.filter(c => c.status !== 'nueva').length;
 
-  let totalFenceM = 0;
-  fences.forEach(f => {
-    for (let i = 0; i < f.points.length - 1; i++) {
-      const p1 = f.points[i];
-      const p2 = f.points[i + 1];
-      totalFenceM += Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) * 0.1;
-    }
-  });
-
-  let totalWireM = 0;
-  wiring.forEach(w => {
-    for (let i = 0; i < w.points.length - 1; i++) {
-      const p1 = w.points[i];
-      const p2 = w.points[i + 1];
-      totalWireM += Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2) * 0.1;
-    }
-  });
+  const totalFenceUnits = routeLength(fences);
+  const totalWireUnits = routeLength(wiring);
 
   const toggleLayer = (key: keyof LayerVisibility) => {
     setLayers(prev => ({ ...prev, [key]: !prev[key] }));
@@ -185,7 +174,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
       title: 'Cerco Eléctrico & Avisos ⚡',
       color: '#d97706',
       icon: <Zap className="w-3.5 h-3.5" />,
-      countBadge: `${Math.round(totalFenceM)} m`
+      countBadge: distanceLabel(totalFenceUnits, metersPerUnit)
     },
     {
       id: 'wiring',
@@ -194,7 +183,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
       title: 'Canalización Conduit & UTP/FO',
       color: '#10b981',
       icon: <Cable className="w-3.5 h-3.5" />,
-      countBadge: `${Math.round(totalWireM)} m`
+      countBadge: distanceLabel(totalWireUnits, metersPerUnit)
     },
     {
       id: 'antennas',
@@ -228,7 +217,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
       title: 'Retícula CAD & Coordenadas',
       color: '#64748b',
       icon: <Grid className="w-3.5 h-3.5" />,
-      countBadge: '70px ~ 7m'
+      countBadge: distanceLabel(70, metersPerUnit)
     },
     {
       id: 'mapBackground',
@@ -241,7 +230,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
   ];
 
   return (
-    <div className="absolute top-14 left-4 z-40 w-84 md:w-96 bg-white/95 border border-stone-200 rounded-2xl shadow-xl backdrop-blur-md overflow-hidden text-slate-800 flex flex-col max-h-[80vh]">
+    <div className="workspace-panel z-40 w-80 shrink-0 bg-white border border-stone-200 border-l shadow-sm overflow-hidden text-slate-800 flex flex-col h-full">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50">
         <div className="flex items-center gap-2">
@@ -250,7 +239,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
           </div>
           <div>
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">
-              Gestor de Capas CAD (Layers)
+              Capas
             </h3>
             <p className="text-[11px] text-slate-500">
               Control independiente de visibilidad y bloqueo
@@ -259,6 +248,7 @@ export const LayerManagerPanel: React.FC<LayerManagerPanelProps> = ({
         </div>
         <button
           onClick={onClose}
+          aria-label="Cerrar capas"
           className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-stone-200/60 cursor-pointer"
         >
           <X className="w-4 h-4" />

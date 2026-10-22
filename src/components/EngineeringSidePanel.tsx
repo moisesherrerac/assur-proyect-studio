@@ -21,7 +21,7 @@ import {
   Printer,
   FileSpreadsheet,
   Save,
-  Compass
+  Compass, X
 } from 'lucide-react';
 
 interface EngineeringSidePanelProps {
@@ -72,16 +72,17 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
 
   return (
     <div
-      className={`relative bg-white border-l border-stone-200 flex flex-col h-full transition-all duration-200 z-30 shadow-md text-slate-800 ${
+      className={`workspace-panel shrink-0 relative bg-white border-l border-stone-200 flex flex-col h-full transition-all duration-200 z-30 shadow-md text-slate-800 ${
         isOpen ? 'w-80' : 'w-10'
       }`}
     >
       <button
         onClick={() => setIsOpen(!isOpen)}
-        title={isOpen ? 'Contraer Editor de Viñeta' : 'Editar Datos de Viñeta y Simbología'}
-        className="absolute -left-3.5 top-12 z-40 w-7 h-7 bg-white border border-stone-300 hover:border-sky-500 text-sky-600 rounded-full flex items-center justify-center shadow-md transition-transform hover:scale-105 cursor-pointer"
+        title={isOpen ? 'Cerrar cajetín' : 'Abrir cajetín'}
+        aria-label={isOpen ? 'Cerrar cajetín' : 'Abrir cajetín'}
+        className="absolute right-2 top-2 z-40 w-8 h-8 bg-white border border-stone-300 hover:border-sky-500 text-sky-600 rounded-full flex items-center justify-center shadow-md transition-transform hover:scale-105 cursor-pointer"
       >
-        {isOpen ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        {isOpen ? <X className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
       </button>
 
       {!isOpen ? (
@@ -96,7 +97,7 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
         </div>
       ) : (
         <div className="flex flex-col h-full overflow-hidden">
-          <div className="p-3.5 border-b border-stone-200 bg-stone-50">
+          <div className="p-3.5 pr-11 border-b border-stone-200 bg-stone-50">
             <div className="flex items-center gap-2 mb-1">
               <div className="p-1.5 rounded-lg bg-sky-50 border border-sky-200 text-sky-600">
                 <Shield className="w-4 h-4" />
@@ -105,30 +106,11 @@ export const EngineeringSidePanel: React.FC<EngineeringSidePanelProps> = ({
                 <h3 className="text-xs font-bold text-slate-900 tracking-wide uppercase">
                   Cajetín y Simbología
                 </h3>
-                <p className="text-[11px] text-slate-500">
-                  Sincronizado en vivo con la lámina CAD
-                </p>
+
               </div>
             </div>
 
             <div className="mt-2.5 flex gap-1.5">
-              <button
-                onClick={onExportPdf}
-                className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[11px] font-semibold shadow-xs transition-all cursor-pointer"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>Exportar PDF</span>
-              </button>
-              {onSaveProjectJson && (
-                <button
-                  onClick={onSaveProjectJson}
-                  className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white hover:bg-stone-100 text-slate-700 border border-stone-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"
-                  title="Descargar archivo editable del proyecto (.cadmap)"
-                >
-                  <Save className="w-3.5 h-3.5 text-sky-600" />
-                  <span>.cadmap</span>
-                </button>
-              )}
               <button
                 onClick={onOpenSignatureModal}
                 className="flex items-center justify-center gap-1 py-1.5 px-2 bg-white hover:bg-stone-100 text-slate-700 border border-stone-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer"

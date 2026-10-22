@@ -165,3 +165,11 @@ El editor inicia en **Posición libre**: cercos, equipos, textos y vértices se 
 El editor de notas permite negrita, cursiva y subrayado mediante selección de texto o al escribir. Conserva los saltos de línea y el formato en las copias editables y en Mis planos. Los proyectos anteriores con notas de texto simple siguen siendo compatibles.
 
 El cajetín distribuye todos los párrafos y ajusta la tipografía hasta un mínimo legible. Si el texto excede el espacio disponible, muestra «CONTINÚA EN ANEXO DE NOTAS» y la exportación añade las hojas necesarias al mismo PDF A3 o A4. El anexo conserva el formato y la referencia de lámina y revisión. No se elimina texto ni se limita el número de párrafos.
+
+### Espacio de trabajo
+
+- «Solo plano» oculta herramientas, paneles, estado y controles para revisar la lámina. «Volver a editar» restaura la vista de trabajo. En este modo los clics y Supr no editan el dibujo.
+- «Vista y opciones» permite recuperar u ocultar herramientas, controles, coordenadas y ayuda inicial. El cajetín se abre desde la barra superior; capas y propiedades tienen cierre explícito. Solo se muestra un panel lateral a la vez.
+- Los controles de zoom y ajuste ocupan una barra bajo el lienzo, sin tapar el plano. Las instrucciones de trazado aparecen fuera del dibujo mientras se usa la herramienta, con Finalizar y Cancelar. El aviso persistente de cámaras vacías fue retirado.
+- Las medidas del panel de capas usan la calibración del proyecto. Sin calibración se indican unidades del plano, sin inventar metros.
+- Se conserva el plano y la exportación al ocultar elementos de la interfaz. La vista estrecha adapta los paneles; la edición táctil con gestos no está certificada.

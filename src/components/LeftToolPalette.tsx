@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useRef, useState } from 'react';
+import React, { useLayoutEffect, useRef, useState, useEffect } from 'react';
 import { ActiveTool, CameraInsertionPreset } from '../types/cad';
 import { FENCE_PROFILES } from '../utils/fences';
 import { CAMERA_CRITERIA_PRESETS } from '../utils/symbology';
@@ -65,11 +65,19 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
     return () => observer.disconnect();
   }, [toolCount]);
   const columns = Math.ceil(toolCount / rows);
+  useEffect(() => {
+    if (!cameraMenuOpen && !colorMenuOpen && !northMenuOpen) return;
+    const close = () => { setCameraMenuOpen(false); setColorMenuOpen(false); setNorthMenuOpen(false); };
+    const outside = (event: PointerEvent) => { if (!railRef.current?.contains(event.target as Node)) close(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') {event.stopPropagation(); close();} };
+    document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape, true);
+    return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape, true); };
+  }, [cameraMenuOpen, colorMenuOpen, northMenuOpen]);
 
   const isCameraActive = activeTool.startsWith('camera-');
 
   return (
-    <aside ref={railRef} aria-label="Herramientas del plano" className="tool-rail bg-white border-r border-stone-200 z-30 select-none shrink-0" style={{ '--rail-rows': rows, '--rail-columns': columns, '--rail-width': `${columns * 104 + (columns - 1) * 2 + 8}px` } as React.CSSProperties}>
+    <aside ref={railRef} aria-label="Herramientas del plano" className="tool-rail bg-white border-r border-stone-200 z-30 select-none shrink-0" style={{ '--rail-rows': rows, '--rail-columns': columns, '--rail-width': `calc(${columns} * var(--rail-cell-width) + ${(columns - 1) * 2 + 8}px)` } as React.CSSProperties}>
       {/* 1. SELECCIÓN */}
       <div className="flex flex-col items-center w-full px-2 mb-2">
         <button
@@ -170,6 +178,7 @@ export const LeftToolPalette: React.FC<LeftToolPaletteProps> = ({
                   type="range"
                   min="0"
                   max="359"
+                  aria-label="Orientación del norte en herramientas"
                   value={northAngle}
                   onChange={e => onChangeNorthAngle?.(Number(e.target.value))}
                   className="w-full accent-purple-600 cursor-pointer"

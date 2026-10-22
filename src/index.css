@@ -25,9 +25,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* Compact tools fit their actual available height, adding columns when needed. */
 .tool-rail {
   --rail-cell-height: 34px;
+  --rail-cell-width: 104px;
   display: grid;
   grid-auto-flow: column;
-  grid-template-columns: repeat(var(--rail-columns), 104px);
+  grid-template-columns: repeat(var(--rail-columns), var(--rail-cell-width));
   grid-template-rows: repeat(var(--rail-rows), var(--rail-cell-height));
   gap: 2px;
   width: var(--rail-width);
@@ -72,4 +73,24 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (pointer: coarse) { .tool-rail { --rail-cell-height: 44px; } }
 @media (max-width: 600px) {
   .tool-rail .tool-rail-popover { left: 12px; right: 12px; width: auto; max-width: none; }
+}
+
+/* Panels never shrink the drawing to a sliver on narrower screens. */
+.workspace-panel { min-width: 0; max-width: 100%; }
+.workspace-save-status[hidden] { display: none; }
+.canvas-view-controls button { min-height: 34px; }
+[contenteditable]:focus-visible { outline: 2px solid #7e22ce; outline-offset: -2px; }
+@media (max-width: 1023px) {
+  .workspace-panel { position: absolute; inset: 0 0 0 auto; width: 320px; max-width: calc(100% - 44px); z-index: 35; }
+}
+@media (max-width: 600px) {
+  .tool-rail { --rail-cell-width: 44px; }
+  .tool-rail > div > button > span, .tool-rail > div > div > button > span { display: none; }
+  .tool-rail > div > button, .tool-rail > div > div > button { justify-content: center; }
+  .workspace-options { position: fixed; top: 130px; right: 12px; max-height: calc(100dvh - 150px); }
+  .canvas-view-controls { flex-wrap: wrap; }
+  .action-button { min-height: 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tool-rail button, .workspace-panel, .canvas-view-controls button { transition: none; }
 }

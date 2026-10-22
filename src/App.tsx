@@ -20,6 +20,7 @@ import {
   CadStructure,
   CameraInsertionPreset
 } from './types/cad';
+import { defaultWorkspaceView, type WorkspaceView } from './utils/workspace';
 import { prepareImage } from './utils/images';
 import { validateProject, cleanSampleIdentity } from './utils/project';
 import { EquipmentReport } from './components/EquipmentReport';
@@ -131,6 +132,17 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
   );
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
   const [isLayersOpen, setIsLayersOpen] = useState(false);
+  const [workspaceView, setWorkspaceView] = useState<WorkspaceView>(() => ({...defaultWorkspaceView, showTools: !window.matchMedia('(max-width: 600px)').matches}));
+  const selectElement = (id: string | null) => {
+    if (id) { setIsSidePanelOpen(false); setIsLayersOpen(false); }
+    setSelectedId(id);
+  };
+  const toggleLayers = () => { setIsSidePanelOpen(false); setSelectedId(null); setIsLayersOpen(open => !open); };
+  const toggleTitleBlock = () => { setIsLayersOpen(false); setSelectedId(null); setIsSidePanelOpen(open => !open); };
+  const toggleFocusMode = () => {
+    setWorkspaceView(view => ({...view, focusMode: !view.focusMode}));
+    setIsSidePanelOpen(false); setIsLayersOpen(false); setSelectedId(null); setActiveTool('select');
+  };
 
   const [layers, setLayers] = useState<LayerVisibility>(
     initialSavedData?.layers || {
@@ -385,8 +397,9 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement?.tagName.toLowerCase();
-      const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select';
+      const isTyping = activeEl === 'input' || activeEl === 'textarea' || activeEl === 'select' || (document.activeElement as HTMLElement)?.isContentEditable;
       if (isTyping || document.querySelector('[role="dialog"]')) return;
+      if (e.key === 'Escape') { setIsLayersOpen(false); setIsSidePanelOpen(false); setSelectedId(null); return; }
 
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -679,10 +692,12 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
     <div className="flex flex-col w-screen h-screen overflow-hidden bg-stone-100 font-sans text-slate-800">
       {/* Cabecera Superior Redistribuida (Limpia y Espaciosa) */}
       <Toolbar
+        workspaceView={workspaceView} setWorkspaceView={setWorkspaceView}
+        onToggleFocusMode={toggleFocusMode} onToggleTitleBlock={toggleTitleBlock} isTitleBlockOpen={isSidePanelOpen}
         onOpenLibrary={() => setLibraryOpen(true)}
         onSignOut={() => { if (window.confirm('¿Cerrar sesión? Guarda primero en Mis planos o descarga una copia. Se eliminará el borrador temporal de esta pestaña.')) onSignOut(); }}
         onOpenReport={() => setIsReportOpen(true)}
-        onCalibrate={() => { setActiveTool('measure'); setNotice('Marca dos puntos de distancia conocida con la herramienta Medir y completa la distancia real.'); }}
+        onCalibrate={() => { setActiveTool('measure'); setWorkspaceView(view => ({...view, focusMode:false})); }}
         calibrated={Boolean(metadata.metersPerUnit)}
         pdfFormat={pdfFormat} setPdfFormat={setPdfFormat} exporting={exporting}
         showFov={showFov}
@@ -711,27 +726,26 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
         hasPlanImage={Boolean(cadBackgroundImageUrl)}
         autosaveStatus={autosaveStatus}
         onOpenAiAssistant={() => setIsAiModalOpen(true)}
-        onToggleLayers={() => setIsLayersOpen(prev => !prev)}
+        onToggleLayers={toggleLayers}
         isLayersOpen={isLayersOpen}
       />
 
-      <div className="px-3 py-1.5 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs shrink-0" role="status" aria-live="polite">
+      <div hidden={workspaceView.focusMode && !['error','partial'].includes(autosaveStatus)} className="workspace-save-status px-3 py-1.5 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs shrink-0" role="status" aria-live="polite">
         <span className={autosaveStatus === 'error' ? 'text-red-700 font-semibold' : autosaveStatus === 'partial' ? 'text-amber-800' : 'text-slate-600'}>
-          {autosaveStatus === 'saved' ? 'Borrador temporal en esta pestaña' : autosaveStatus === 'saving' ? 'Guardando borrador…' : autosaveStatus === 'error' ? 'No se pudo guardar o recuperar el respaldo. Descarga una copia .cadmap.' : autosaveStatus === 'partial' ? 'Respaldo parcial: falta la imagen original. Descarga una copia .cadmap.' : 'Guarda en Mis planos para conservar tu proyecto en GitHub privado.'}
+          {autosaveStatus === 'saved' ? 'Borrador en esta pestaña' : autosaveStatus === 'saving' ? 'Guardando borrador…' : autosaveStatus === 'error' ? 'No se pudo guardar o recuperar el respaldo. Descarga una copia .cadmap.' : autosaveStatus === 'partial' ? 'Respaldo parcial: falta la imagen original. Descarga una copia .cadmap.' : 'Guarda tu proyecto en Mis planos.'}
         </span>
-        <span>{cloudEntry ? `Último guardado en GitHub: ${new Date(cloudEntry.updatedAt).toLocaleString('es-CL')} · ${cloudEntry.name}` : 'Sin guardar en GitHub'}</span>
-        <button className="underline underline-offset-2 text-purple-800" onClick={() => setActiveTool('measure')}>{metadata.metersPerUnit ? 'Distancias calibradas · Medir / recalibrar' : 'Distancias sin calibrar · Calibrar'}</button>
+        <span>{cloudEntry ? `Último guardado: ${new Date(cloudEntry.updatedAt).toLocaleString('es-CL')} · ${cloudEntry.name}` : 'Sin guardar en Mis planos'}</span>
       </div>
       {notice && <div role="status" className="px-3 py-2 bg-amber-50 text-amber-950 text-sm flex items-center gap-3 shrink-0"><span className="flex-1">{notice}</span><button aria-label="Cerrar aviso" onClick={() => setNotice('')} className="underline">Cerrar</button></div>}
       {libraryOpen && <PlanLibrary library={library} current={cloudEntry} getDocument={getProjectData} onSaved={setCloudEntry} onOpen={loadProjectData} onClose={() => setLibraryOpen(false)} onAccessLost={onAccessLost} onRecoverLegacy={() => {
         try { const raw = localStorage.getItem('cad_project_autosave_v2'); if (!raw) { setNotice('No hay un respaldo local de la versión anterior en este navegador.'); return; } loadProjectData(JSON.parse(raw)); }
         catch { setNotice('No se pudo recuperar el respaldo anterior. Sus datos se conservan sin cambios.'); }
       }}/>}
-      {isReportOpen && <EquipmentReport project={{ metadata, cameras, antennas, audioAlarms, fences, wiring }} onClose={() => setIsReportOpen(false)} onUpdateGlosa={updateGlosa} onSelect={setSelectedId}/>}
+      {isReportOpen && <EquipmentReport project={{ metadata, cameras, antennas, audioAlarms, fences, wiring }} onClose={() => setIsReportOpen(false)} onUpdateGlosa={updateGlosa} onSelect={id => { setWorkspaceView(view => ({...view,focusMode:false})); selectElement(id); }}/>}
       {/* Área Principal de Trabajo */}
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* Costado Izquierdo en Columna: Opciones de Adición y Elementos */}
-        <LeftToolPalette
+        {!workspaceView.focusMode && workspaceView.showTools && <LeftToolPalette
           activeTool={activeTool}
           setActiveTool={setActiveTool}
           cameraPreset={cameraPreset}
@@ -742,10 +756,16 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           onChangeNorthAngle={ang => {
             setMetadata(prev => ({ ...prev, northAngle: ang }));
           }}
-        />
+        />}
 
         {/* Editor de Lienzo CAD */}
         <CanvasEditor
+          readOnly={workspaceView.focusMode}
+          showHelp={workspaceView.showHelp && !workspaceView.focusMode}
+          onHideHelp={() => setWorkspaceView(view => ({...view,showHelp:false}))}
+          showCoordinates={workspaceView.showCoordinates && !workspaceView.focusMode}
+          showViewControls={workspaceView.showControls && !workspaceView.focusMode}
+          onHideViewControls={() => setWorkspaceView(view => ({...view, showControls:false}))}
           cadBackgroundImageUrl={cadBackgroundImageUrl}
           activeTool={activeTool}
           setActiveTool={setActiveTool}
@@ -767,7 +787,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           metadata={metadata}
           setMetadata={setMetadata}
           selectedId={selectedId}
-          setSelectedId={setSelectedId}
+          setSelectedId={selectElement}
           theme={theme}
           showFov={showFov}
           showGrid={showGrid}
@@ -777,7 +797,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           setGridSize={setGridSize}
           layers={layers}
           locks={locks}
-          onToggleLayerManager={() => setIsLayersOpen(prev => !prev)}
+          onToggleLayerManager={toggleLayers}
           onCanvasRefReady={canvas => {
             canvasRefInstance.current = canvas;
           }}
@@ -801,7 +821,8 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
 
         {/* Paneles Flotantes y Laterales */}
         <LayerManagerPanel
-          isOpen={isLayersOpen}
+          metersPerUnit={metadata.metersPerUnit}
+          isOpen={isLayersOpen && !workspaceView.focusMode}
           onClose={() => setIsLayersOpen(false)}
           layers={layers}
           setLayers={setLayers}
@@ -837,7 +858,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           setAnnotations={setAnnotations}
         />
 
-        <EngineeringSidePanel
+        <div style={{display: !workspaceView.focusMode && isSidePanelOpen ? 'contents' : 'none'}}><EngineeringSidePanel
           cameras={cameras}
           antennas={antennas}
           audioAlarms={audioAlarms}
@@ -851,9 +872,9 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           onOpenSignatureModal={() => setIsSignatureModalOpen(true)}
           onExportPdf={handleExportPdf}
           onSaveProjectJson={handleSaveProjectJson}
-          isOpen={isSidePanelOpen}
+          isOpen={true}
           setIsOpen={setIsSidePanelOpen}
-        />
+        /></div>
       </div>
 
       <FilterModal

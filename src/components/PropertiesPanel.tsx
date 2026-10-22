@@ -141,7 +141,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }
 
   return (
-    <div className="w-80 bg-white border-l border-stone-200 flex flex-col h-full overflow-y-auto text-slate-800 shadow-lg z-20">
+    <div className="workspace-panel w-80 shrink-0 bg-white border-l border-stone-200 flex flex-col h-full overflow-y-auto text-slate-800 shadow-lg z-20">
       <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200 bg-stone-50/90 sticky top-0 backdrop-blur-md">
         <div className="flex items-center gap-2 min-w-0">
           {currentStruct && <Pentagon className="w-4 h-4 text-sky-600 shrink-0" />}
@@ -173,6 +173,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
           </button>
           <button
             onClick={onClose}
+            aria-label="Cerrar propiedades"
             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-stone-100 rounded-md transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
