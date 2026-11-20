@@ -21,11 +21,11 @@ import {
   CameraInsertionPreset
 } from './types/cad';
 import { defaultWorkspaceView, type WorkspaceView } from './utils/workspace';
-import { prepareImage } from './utils/images';
+import { readOriginalImage } from './utils/images';
 import { validateProject, cleanSampleIdentity } from './utils/project';
 import { EquipmentReport } from './components/EquipmentReport';
 import type { EquipmentKind } from './utils/equipmentReport';
-import { processImageToCad } from './utils/cadFilter';
+import { renderPlanImage } from './utils/cadFilter';
 import { autoVectorizeStructuresFromImage } from './utils/structureVectorizer';
 import { exportCadBlueprintToPdf } from './utils/pdfExport';
 import { Toolbar } from './components/Toolbar';
@@ -177,7 +177,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
 
   // Background map image: clean null slate by default
   const [rawImageSrc, setRawImageSrc] = useState<string | null>(
-    initialSavedData?.rawImageSrc || null
+    initialSavedData?.rawImageSrc || (initialSavedData?.theme === 'original' ? initialSavedData.cadBackgroundImageUrl : null) || null
   );
   const [cadBackgroundImageUrl, setCadBackgroundImageUrl] = useState<string | null>(
     initialSavedData?.cadBackgroundImageUrl || null
@@ -451,7 +451,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
           wiring,
           annotations,
           theme,
-          rawImageSrc,
+          rawImageSrc: rawImageSrc === cadBackgroundImageUrl ? null : rawImageSrc,
           cadBackgroundImageUrl,
           layers,
           locks,
@@ -509,17 +509,13 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
   ]);
 
   const handleThemeChange = async (newTheme: CadTheme) => {
-    setTheme(newTheme);
     const updatedSettings = { ...filterSettings, theme: newTheme };
-    setFilterSettings(updatedSettings);
-
-    if (rawImageSrc) {
-      const img = new Image();
-      img.src = rawImageSrc;
-      img.onload = async () => {
-        const cadResult = await processImageToCad(img, updatedSettings);
-        setCadBackgroundImageUrl(cadResult);
-      };
+    try {
+      if (rawImageSrc) setCadBackgroundImageUrl(await renderPlanImage(rawImageSrc, updatedSettings));
+      setTheme(newTheme);
+      setFilterSettings(updatedSettings);
+    } catch {
+      setNotice('No se pudo cambiar el modo de imagen.');
     }
   };
 
@@ -559,7 +555,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
       wiring,
       annotations,
       theme,
-      rawImageSrc,
+      rawImageSrc: rawImageSrc === cadBackgroundImageUrl ? null : rawImageSrc,
       cadBackgroundImageUrl,
       layers,
       locks,
@@ -595,7 +591,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
     setCameraPreset({ ...DEFAULT_PRESET, ...data.cameraPreset });
     setFilterSettings({ ...DEFAULT_FILTER_SETTINGS, ...data.filterSettings });
     setCadBackgroundImageUrl(data.cadBackgroundImageUrl || data.rawImageSrc || null);
-    setRawImageSrc(data.rawImageSrc || null); setSelectedId(null);
+    setRawImageSrc(data.rawImageSrc || (data.theme === 'original' ? data.cadBackgroundImageUrl : null) || null); setSelectedId(null);
     hasSavedWorkRef.current = true;
     setNotice('Proyecto abierto. Guarda los cambios en Mis planos para acceder a ellos desde otro computador.');
     return true;
@@ -626,7 +622,7 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
     }
     const reader = new FileReader();
     reader.onload = async e => {
-      try { setDroppedImage(await prepareImage(e.target?.result as string)); setIsFilterModalOpen(true); }
+      try { setDroppedImage(await readOriginalImage(e.target?.result as string)); setIsFilterModalOpen(true); }
       catch { setNotice('No se pudo abrir la imagen. El plano actual se conserva.'); }
     };
     reader.onerror = () => setNotice('No se pudo leer la imagen. Inténtalo de nuevo.');
@@ -881,9 +877,8 @@ export default function App({ library, onSignOut, onAccessLost }: { library: Lib
         isOpen={isFilterModalOpen}
         onClose={() => { setIsFilterModalOpen(false); setDroppedImage(null); }}
         rawImageSrc={droppedImage || rawImageSrc}
-        setRawImageSrc={setRawImageSrc}
+        isNewImage={Boolean(droppedImage)}
         filterSettings={filterSettings}
-        setFilterSettings={setFilterSettings}
         onApplyCadImage={(cadUrl, detectedStructures, source, settings) => {
           const replacing = Boolean(rawImageSrc || cadBackgroundImageUrl) && source !== rawImageSrc;
           if (replacing && !window.confirm('Cambiar la imagen puede desalinear equipos y trazados. Se conservarán sus posiciones y se quitará la calibración. ¿Continuar?')) return false;

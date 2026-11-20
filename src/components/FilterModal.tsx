@@ -1,7 +1,7 @@
-import { prepareImage } from '../utils/images';
+import { readOriginalImage } from '../utils/images';
 import React, { useState, useEffect } from 'react';
 import { ImageFilterSettings, CadTheme, CadStructure } from '../types/cad';
-import { processImageToCad } from '../utils/cadFilter';
+import { renderPlanImage } from '../utils/cadFilter';
 import { getPresetSampleMaps, SampleMap } from '../utils/samples';
 import {
   autoVectorizeStructuresFromImage,
@@ -23,9 +23,8 @@ interface FilterModalProps {
   isOpen: boolean;
   onClose: () => void;
   rawImageSrc: string | null;
-  setRawImageSrc: (src: string | null) => void;
+  isNewImage: boolean;
   filterSettings: ImageFilterSettings;
-  setFilterSettings: React.Dispatch<React.SetStateAction<ImageFilterSettings>>;
   onApplyCadImage: (cadDataUrl: string, detectedStructures: CadStructure[], source: string, settings: ImageFilterSettings) => boolean | void;
 }
 
@@ -33,9 +32,8 @@ export const FilterModal: React.FC<FilterModalProps> = ({
   isOpen,
   onClose,
   rawImageSrc,
-  setRawImageSrc,
+  isNewImage,
   filterSettings,
-  setFilterSettings,
   onApplyCadImage
 }) => {
   const [draftImage, setDraftImage] = useState(rawImageSrc);
@@ -55,9 +53,10 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       setDraftImage(rawImageSrc);
       setError(''); setPreviewCadUrl(null); setAutoTraceStructures(false);
       setSampleMaps(getPresetSampleMaps());
-      setLocalSettings(filterSettings);
+      setLocalSettings(isNewImage ? { ...filterSettings, theme: 'original' } : filterSettings);
+      setActiveTab(isNewImage ? 'tune' : 'upload');
     }
-  }, [isOpen, rawImageSrc]);
+  }, [isOpen, rawImageSrc, isNewImage]);
 
   useEffect(() => {
     if (!draftImage || !isOpen) return;
@@ -67,10 +66,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
 
     const timer = setTimeout(async () => {
       try {
-        const img = new Image();
-        img.src = draftImage;
-        await img.decode();
-        const cadResult = await processImageToCad(img, localSettings);
+        const cadResult = await renderPlanImage(draftImage, localSettings);
         let structs: CadStructure[] = [];
         if (autoTraceStructures) {
           structs = await autoVectorizeStructuresFromImage(draftImage);
@@ -102,7 +98,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     reader.onload = async event => {
       const result = event.target?.result as string;
       setSelectedSampleId(null);
-      try { setDraftImage(await prepareImage(result)); setError(''); } catch { setError('No se pudo abrir la imagen.'); }
+      try {
+        setDraftImage(await readOriginalImage(result));
+        setLocalSettings(settings => ({ ...settings, theme: 'original' }));
+        setAutoTraceStructures(false);
+        setError('');
+      } catch { setError('No se pudo abrir la imagen.'); }
       setActiveTab('tune');
     };
     reader.readAsDataURL(file);
@@ -115,10 +116,19 @@ export const FilterModal: React.FC<FilterModalProps> = ({
       if (items[i].type.indexOf('image') !== -1) {
         const blob = items[i].getAsFile();
         if (blob) {
+          if (!/^image\/(png|jpeg|webp)$/.test(blob.type) || blob.size > 20 * 1024 * 1024) {
+            setError('Usa PNG, JPG o WebP de hasta 20 MB.');
+            return;
+          }
           const reader = new FileReader();
           reader.onload = async event => {
             setSelectedSampleId(null);
-            try { setDraftImage(await prepareImage(event.target?.result as string)); setError(''); } catch { setError('No se pudo pegar la imagen.'); }
+            try {
+              setDraftImage(await readOriginalImage(event.target?.result as string));
+              setLocalSettings(settings => ({ ...settings, theme: 'original' }));
+              setAutoTraceStructures(false);
+              setError('');
+            } catch { setError('No se pudo pegar la imagen.'); }
             setActiveTab('tune');
           };
           reader.readAsDataURL(blob);
@@ -132,8 +142,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
     if (!draftImage || isProcessing || applying) return;
     setApplying(true); setError('');
     try {
-      const img = new Image(); img.src = draftImage; await img.decode();
-      const fullCad = await processImageToCad(img, localSettings);
+      const fullCad = await renderPlanImage(draftImage, localSettings);
       const accepted = onApplyCadImage(fullCad, autoTraceStructures ? detectedPreviewStructures : [], draftImage, localSettings);
       if (accepted !== false) onClose();
     } catch { setError('No se pudo aplicar la imagen. El plano anterior se conserva.'); }
@@ -156,7 +165,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Importar Captura de Google Maps a Plano de Planta CAD
+                Cargar imagen base del plano
               </h3>
               <p className="text-xs text-slate-500">
                 Ajusta la imagen base conservando los equipos del plano. El trazado de construcciones es opcional.
@@ -183,7 +192,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             }`}
           >
             <Upload className="w-4 h-4" />
-            <span>1. Subir Captura de Google Maps</span>
+            <span>Subir plano o imagen</span>
           </button>
           <button
             onClick={() => setActiveTab('tune')}
@@ -194,7 +203,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
             }`}
           >
             <Sliders className="w-4 h-4" />
-            <span>2. Ajustar Claridad y Perímetros</span>
+            <span>Modo de imagen</span>
           </button>
           <button
             onClick={() => setActiveTab('samples')}
@@ -237,7 +246,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     <Upload className="w-6 h-6" />
                   </div>
                   <span className="text-xs font-bold text-slate-900 mb-1">
-                    Haz clic para cargar tu captura de Google Maps
+                    Elige un plano o una imagen
                   </span>
                   <span className="text-[11px] text-slate-500 mb-3">
                     Soporta PNG, JPG o WebP en alta resolución
@@ -258,7 +267,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     Equipos y trazados existentes:
                   </div>
                   <p className="leading-relaxed">
-                    Aplicar filtros conserva los elementos actuales. Si reemplazas la imagen, revisa su alineación y vuelve a calibrar las distancias.
+                    Cambiar el modo de imagen conserva los elementos actuales. Si reemplazas la imagen, revisa su alineación y vuelve a calibrar las distancias.
                   </p>
                 </div>
               </div>
@@ -275,6 +284,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                     onClick={() => {
                       setSelectedSampleId(sample.id);
                       setDraftImage(sample.dataUrl);
+                      setLocalSettings(settings => ({ ...settings, theme: 'technical-orthophoto' }));
                       setActiveTab('tune');
                     }}
                     className="p-3 bg-stone-50 border border-stone-200 hover:border-sky-400 rounded-xl cursor-pointer transition-all group"
@@ -296,6 +306,11 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   </label>
                   <div className="space-y-1.5">
                     {[
+                      {
+                        id: 'original' as CadTheme,
+                        label: 'Original sin filtros',
+                        desc: 'Conserva colores, trazos y resolución de la imagen cargada'
+                      },
                       {
                         id: 'technical-orthophoto' as CadTheme,
                         label: 'Ortofoto Técnica Gris Claro (Lámina Oficial)',
@@ -334,46 +349,50 @@ export const FilterModal: React.FC<FilterModalProps> = ({
                   </div>
                 </div>
 
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
-                    <span>Intensidad de Ortofoto Base</span>
-                    <span className="font-mono font-semibold text-sky-700">
-                      {localSettings.satelliteOpacity}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="35"
-                    max="90"
-                    value={localSettings.satelliteOpacity}
-                    onChange={e =>
-                      setLocalSettings(prev => ({
-                        ...prev,
-                        satelliteOpacity: Number(e.target.value)
-                      }))
-                    }
-                    className="w-full accent-sky-600 cursor-pointer"
-                  />
-                </div>
+                {localSettings.theme !== 'original' && (
+                  <>
+                    <div>
+                      <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                        <span>Intensidad de Ortofoto Base</span>
+                        <span className="font-mono font-semibold text-sky-700">
+                          {localSettings.satelliteOpacity}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="35"
+                        max="90"
+                        value={localSettings.satelliteOpacity}
+                        onChange={e =>
+                          setLocalSettings(prev => ({
+                            ...prev,
+                            satelliteOpacity: Number(e.target.value)
+                          }))
+                        }
+                        className="w-full accent-sky-600 cursor-pointer"
+                      />
+                    </div>
 
-                <div>
-                  <div className="flex justify-between text-[11px] text-slate-700 mb-1">
-                    <span>Nitidez y Contraste de Techumbres</span>
-                    <span className="font-mono font-semibold text-sky-700">
-                      {localSettings.contrast}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min="80"
-                    max="180"
-                    value={localSettings.contrast}
-                    onChange={e =>
-                      setLocalSettings(prev => ({ ...prev, contrast: Number(e.target.value) }))
-                    }
-                    className="w-full accent-sky-600 cursor-pointer"
-                  />
-                </div>
+                    <div>
+                      <div className="flex justify-between text-[11px] text-slate-700 mb-1">
+                        <span>Nitidez y Contraste de Techumbres</span>
+                        <span className="font-mono font-semibold text-sky-700">
+                          {localSettings.contrast}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="80"
+                        max="180"
+                        value={localSettings.contrast}
+                        onChange={e =>
+                          setLocalSettings(prev => ({ ...prev, contrast: Number(e.target.value) }))
+                        }
+                        className="w-full accent-sky-600 cursor-pointer"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -404,12 +423,12 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               {previewCadUrl ? (
                 <img
                   src={previewCadUrl}
-                  alt="Vista previa de ortofoto CAD"
+                  alt="Vista previa de la imagen base"
                   className="max-w-full max-h-full object-contain"
                 />
               ) : (
                 <div className="text-center text-slate-400 text-xs">
-                  Carga una captura de Google Maps para previsualizar.
+                  Carga un plano o una imagen para ver la vista previa.
                 </div>
               )}
             </div>
@@ -435,7 +454,7 @@ export const FilterModal: React.FC<FilterModalProps> = ({
               className="flex items-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-sm cursor-pointer transition-all"
             >
               <Check className="w-4 h-4" />
-              <span>{applying ? 'Aplicando…' : 'Aplicar imagen y filtros'}</span>
+              <span>{applying ? 'Aplicando…' : 'Aplicar imagen'}</span>
             </button>
           </div>
         </div>
