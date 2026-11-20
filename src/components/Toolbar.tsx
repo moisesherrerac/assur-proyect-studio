@@ -64,7 +64,7 @@ export const Toolbar: React.FC<ToolbarProps> = p => {
           <label className="flex gap-2"><input type="checkbox" checked={p.snapToGrid} onChange={e=>p.setSnapToGrid(e.target.checked)}/>Ajustar posiciones a la cuadrícula</label>
           <label className="block">Paso de ajuste (unidades)<select className="form-control" value={p.gridSize} onChange={e=>p.setGridSize(Number(e.target.value))}>{GRID_STEPS.map(n=><option key={n} value={n}>{n} u</option>)}</select></label>
           <label className="block">Estilo del plano<select className="form-control" value={p.theme} onChange={e=>p.setTheme(e.target.value as CadTheme)}>
-            <option value="technical-orthophoto">Ortofoto clara</option><option value="orthophoto-hybrid">Ortofoto y bordes</option><option value="architectural-white">Papel blanco</option><option value="autocad-dark">Fondo oscuro</option><option value="blueprint-blue">Blueprint azul</option>
+            <option value="original">Original sin filtros</option><option value="technical-orthophoto">Ortofoto clara</option><option value="orthophoto-hybrid">Ortofoto y bordes</option><option value="architectural-white">Papel blanco</option><option value="autocad-dark">Fondo oscuro</option><option value="blueprint-blue">Blueprint azul</option>
           </select></label>
           <label className="block">Norte: {Math.round(p.northAngle || 0)}°<input aria-label="Orientación del norte" className="w-full" type="range" min="0" max="359" value={p.northAngle || 0} onChange={e=>p.onChangeNorthAngle?.(Number(e.target.value))}/></label>
           <button className="action-button w-full" onClick={()=>{p.onCalibrate();setViewOpen(false);}}><Ruler size={16}/>{p.calibrated ? 'Recalibrar distancia' : 'Calibrar distancia'}</button>

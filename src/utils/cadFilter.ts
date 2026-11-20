@@ -1,5 +1,14 @@
 import { ImageFilterSettings } from '../types/cad';
 
+export async function renderPlanImage(source: string, settings: ImageFilterSettings): Promise<string> {
+  const image = new Image();
+  image.src = source;
+  await image.decode();
+
+  if (settings.theme === 'original') return source;
+  return processImageToCad(image, settings);
+}
+
 /**
  * Transforms a Google Maps screenshot or aerial photo into a clean, professional
  * engineering base plan (Ortofoto Técnica CAD en escala de grises clara con realce

@@ -144,6 +144,7 @@ export interface WiringRoute {
 }
 
 export type CadTheme =
+  | 'original'
   | 'technical-orthophoto' // Ortofoto Técnica Gris Claro (Estilo Lámina Oficial)
   | 'orthophoto-hybrid'    // Ortofoto + Bordes Vectoriales Finos
   | 'architectural-white'  // Vectorial Puro Blanco y Negro
